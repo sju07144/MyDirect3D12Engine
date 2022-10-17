@@ -1,10 +1,16 @@
 #include "Mesh.h"
 
-Mesh::Mesh(const std::vector<Vertex>& vertices, const std::vector<uint16_t>& indices)
+Mesh::Mesh(const std::vector<Vertex>& vertices, const std::vector<uint32_t>& indices)
 	: mVertices(vertices), mIndices(indices)
 {
 	vertexByteSize = mVertices.size() * sizeof(Vertex);
 	indexByteSize = mIndices.size() * sizeof(uint16_t);
+}
+
+void Mesh::ConfigureMesh(ID3D12Device* device, ID3D12GraphicsCommandList* commandList)
+{
+	CreateVertexBuffer(device, commandList);
+	CreateIndexBuffer(device, commandList);
 }
 
 ID3D12Resource* Mesh::GetVertexBuffer()

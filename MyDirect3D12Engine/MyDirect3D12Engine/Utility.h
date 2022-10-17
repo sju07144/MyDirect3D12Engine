@@ -15,6 +15,7 @@
 #include <memory>
 #include <stdexcept>
 #include <string>
+#include <unordered_map>
 #include <vector>
 
 /* inline std::string HrToString(HRESULT hr)
@@ -86,6 +87,25 @@ enum class ResourceDimension
 	texture3DArray,
 	textureCube,
 	textureCubeArray
+};
+
+struct Vertex
+{
+	Vertex() = default;
+	Vertex(float px, float py, float pz, 
+		float nx, float ny, float nz, 
+		float tx, float ty, float tz, 
+		float u, float v)
+		: position(XMFLOAT3(px, py, pz)),
+		normal(XMFLOAT3(nx, ny, nz)),
+		tangent(XMFLOAT3(tx, ty, tz)),
+		texCoord(XMFLOAT2(u, v))
+	{ }
+
+	DirectX::XMFLOAT3 position;
+	DirectX::XMFLOAT3 normal;
+	DirectX::XMFLOAT3 tangent;
+	DirectX::XMFLOAT2 texCoord;
 };
 
 class D3D12Utility

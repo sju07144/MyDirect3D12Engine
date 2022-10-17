@@ -1,18 +1,13 @@
 #pragma once
 #include "Utility.h"
 
-struct Vertex
-{
-	DirectX::XMFLOAT3 position;
-	DirectX::XMFLOAT3 normal;
-	DirectX::XMFLOAT2 texCoord;
-};
+
 
 class Mesh
 {
 public:
 	Mesh() = default;
-	Mesh(const std::vector<Vertex>& vertices, const std::vector<uint16_t>& indices);
+	Mesh(const std::vector<Vertex>& vertices, const std::vector<uint32_t>& indices);
 
 	void ConfigureMesh(ID3D12Device* device, ID3D12GraphicsCommandList* commandList);
 
@@ -28,7 +23,7 @@ private:
 	std::vector<Vertex> mVertices;
 	UINT vertexByteSize = 0;
 
-	std::vector<uint16_t> mIndices;
+	std::vector<uint32_t> mIndices;
 	UINT indexByteSize = 0;
 	DXGI_FORMAT indexFormat = DXGI_FORMAT_R16_UINT;
 

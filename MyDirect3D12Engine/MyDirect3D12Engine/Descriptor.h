@@ -18,12 +18,9 @@ public:
 	CD3DX12_GPU_DESCRIPTOR_HANDLE GetGPUDescriptorHandle();
 
 	virtual void CreateDescriptorHeap(ID3D12Device* device, UINT descriptorCount) = 0;
-	virtual ID3D12DescriptorHeap* GetDescriptorHeap() = 0;
 
 	virtual void CreateDescriptor(ID3D12Device* device, DXGI_FORMAT viewFormat,
 		ID3D12Resource* resource = nullptr, ID3D12Resource* counterResource = nullptr, UINT byteSize = 0) = 0;
-	virtual CD3DX12_CPU_DESCRIPTOR_HANDLE GetCPUDescriptorHandle() = 0;
-	virtual CD3DX12_GPU_DESCRIPTOR_HANDLE GetGPUDescriptorHandle() = 0;
 protected:
 	Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> mDescriptorHeap = nullptr;
 
