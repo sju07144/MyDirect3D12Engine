@@ -13,6 +13,6 @@ private:
 	std::vector<Vertex> mVertices;
 	UINT mVertexCount;
 
-	std::vector<uint16_t> mIndices;
+	std::vector<uint32_t> mIndices;
 	UINT mIndexCount;
 };

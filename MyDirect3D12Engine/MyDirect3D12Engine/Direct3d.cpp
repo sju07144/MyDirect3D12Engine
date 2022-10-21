@@ -6,6 +6,7 @@ void BasicDirect3DComponent::CreateBasicDirect3DComponent()
 {
 	CreateFactory();
 	CreateDevice();
+	SetDescriptorSize();
 	CreateFence();
 
 #ifdef DEBUG
@@ -15,16 +16,23 @@ void BasicDirect3DComponent::CreateBasicDirect3DComponent()
 
 void BasicDirect3DComponent::WaitForPreviousFrame(ID3D12CommandQueue* commandQueue)
 {
-	ThrowIfFailed(commandQueue->Signal(mFence.Get(), mCurrentFenceValue));
 	mCurrentFenceValue++;
+	ThrowIfFailed(commandQueue->Signal(mFence.Get(), mCurrentFenceValue));
 
 	if (mFence->GetCompletedValue() < mCurrentFenceValue)
 	{
-		HANDLE eventHandle = CreateEventEx(nullptr, nullptr, 0, 0);
+		HANDLE eventHandle = CreateEventEx(nullptr, false, false, EVENT_ALL_ACCESS);
 		ThrowIfFailed(mFence->SetEventOnCompletion(mCurrentFenceValue, eventHandle));
 		WaitForSingleObject(eventHandle, INFINITE);
 		CloseHandle(eventHandle);
 	}
+}
+
+void BasicDirect3DComponent::SetDescriptorSize()
+{
+	mRtvDescriptorSize = mDevice->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
+	mDsvDescriptorSize = mDevice->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_DSV);
+	mCbvSrvUavDescriptorSize = mDevice->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 }
 
 IDXGIFactory4* BasicDirect3DComponent::GetFactory()
@@ -38,6 +46,19 @@ ID3D12Device* BasicDirect3DComponent::GetDevice()
 ID3D12Fence* BasicDirect3DComponent::GetFence()
 {
 	return mFence.Get();
+}
+
+UINT BasicDirect3DComponent::GetRtvDescriptorSize()
+{
+	return mRtvDescriptorSize;
+}
+UINT BasicDirect3DComponent::GetDsvDescriptorSize()
+{
+	return mDsvDescriptorSize;
+}
+UINT BasicDirect3DComponent::GetCbvSrvUavDescriptorSize()
+{
+	return mCbvSrvUavDescriptorSize;
 }
 
 void BasicDirect3DComponent::CreateFactory()

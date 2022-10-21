@@ -4,40 +4,25 @@ Descriptor::Descriptor(ResourceDimension resourceDimension)
 	: mResourceDimension(resourceDimension)
 { }
 
-void Descriptor::SetDescriptorSizes(ID3D12Device* device)
-{
-	mRtvDescriptorSize = device->GetDescriptorHandleIncrementSize(
-		D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
-	mDsvDescriptorSize = device->GetDescriptorHandleIncrementSize(
-		D3D12_DESCRIPTOR_HEAP_TYPE_DSV);
-	mCbvSrvUavDescriptorSize = device->GetDescriptorHandleIncrementSize(
-		D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
-}
-
-UINT Descriptor::GetRtvDescriptorSize()
-{
-	return mRtvDescriptorSize;
-}
-UINT Descriptor::GetDsvDescriptorSize()
-{
-	return mDsvDescriptorSize;
-}
-UINT Descriptor::GetCbvSrvUavDescriptorSize()
-{
-	return mCbvSrvUavDescriptorSize;
-}
-
 ID3D12DescriptorHeap* Descriptor::GetDescriptorHeap()
 {
 	return mDescriptorHeap.Get();
 }
-CD3DX12_CPU_DESCRIPTOR_HANDLE Descriptor::GetCPUDescriptorHandle()
+CD3DX12_CPU_DESCRIPTOR_HANDLE Descriptor::GetStartCPUDescriptorHandle()
 {
-	return mCpuDescriptorHandle;
+	return CD3DX12_CPU_DESCRIPTOR_HANDLE(mDescriptorHeap->GetCPUDescriptorHandleForHeapStart());
 }
-CD3DX12_GPU_DESCRIPTOR_HANDLE Descriptor::GetGPUDescriptorHandle()
+CD3DX12_GPU_DESCRIPTOR_HANDLE Descriptor::GetStartGPUDescriptorHandle()
 {
-	return mGpuDescriptorHandle;
+	return CD3DX12_GPU_DESCRIPTOR_HANDLE(mDescriptorHeap->GetGPUDescriptorHandleForHeapStart());
+}
+
+void Descriptor::ResetDescriptorHeap()
+{
+	mCpuDescriptorHandle = mDescriptorHeap->GetCPUDescriptorHandleForHeapStart();
+	mGpuDescriptorHandle = mDescriptorHeap->GetGPUDescriptorHandleForHeapStart();
+
+	mDescriptorCount = 0;
 }
 
 RtvDescriptor::RtvDescriptor(ResourceDimension resourceDimension)
@@ -52,16 +37,16 @@ void RtvDescriptor::CreateDescriptorHeap(ID3D12Device* device, UINT descriptorCo
 	rtvHeapDesc.NumDescriptors = descriptorCount;
 	rtvHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_RTV;
 
-	ThrowIfFailed(device->CreateDescriptorHeap(&rtvHeapDesc, IID_PPV_ARGS(&mDescriptorHeap)));
+	ThrowIfFailed(device->CreateDescriptorHeap(&rtvHeapDesc, IID_PPV_ARGS(mDescriptorHeap.GetAddressOf())));
 
 	mCpuDescriptorHandle = CD3DX12_CPU_DESCRIPTOR_HANDLE(mDescriptorHeap->GetCPUDescriptorHandleForHeapStart());
 	mGpuDescriptorHandle = CD3DX12_GPU_DESCRIPTOR_HANDLE(mDescriptorHeap->GetGPUDescriptorHandleForHeapStart());
 }
 
-void RtvDescriptor::CreateDescriptor(ID3D12Device* device, DXGI_FORMAT viewFormat,
+void RtvDescriptor::CreateDescriptor(ID3D12Device* device, UINT descriptorSize, DXGI_FORMAT viewFormat,
 	ID3D12Resource* resource, ID3D12Resource* counterResource, UINT byteSize)
 {
-	D3D12_RENDER_TARGET_VIEW_DESC rtvDesc;
+	/* D3D12_RENDER_TARGET_VIEW_DESC rtvDesc;
 	rtvDesc.Format = viewFormat;
 
 	switch (mResourceDimension)
@@ -74,11 +59,11 @@ void RtvDescriptor::CreateDescriptor(ID3D12Device* device, DXGI_FORMAT viewForma
 	default:
 		throw std::runtime_error("Invalid resource dimension");
 		break;
-	}
+	} */
 
-	device->CreateRenderTargetView(resource, &rtvDesc, mCpuDescriptorHandle);
+	device->CreateRenderTargetView(resource, nullptr, mCpuDescriptorHandle);
 
-	mCpuDescriptorHandle.Offset(1, mRtvDescriptorSize);
+	mCpuDescriptorHandle.Offset(1, descriptorSize);
 
 	mDescriptorCount++;
 }
@@ -101,11 +86,12 @@ void DsvDescriptor::CreateDescriptorHeap(ID3D12Device* device, UINT descriptorCo
 	mGpuDescriptorHandle = CD3DX12_GPU_DESCRIPTOR_HANDLE(mDescriptorHeap->GetGPUDescriptorHandleForHeapStart());
 }
 
-void DsvDescriptor::CreateDescriptor(ID3D12Device* device, DXGI_FORMAT viewFormat,
+void DsvDescriptor::CreateDescriptor(ID3D12Device* device, UINT descriptorSize, DXGI_FORMAT viewFormat,
 	ID3D12Resource* resource, ID3D12Resource* counterResource, UINT byteSize)
 {
 	D3D12_DEPTH_STENCIL_VIEW_DESC dsvDesc;
 	dsvDesc.Format = viewFormat;
+	dsvDesc.Flags = D3D12_DSV_FLAG_NONE;
 
 	switch (mResourceDimension)
 	{
@@ -120,7 +106,7 @@ void DsvDescriptor::CreateDescriptor(ID3D12Device* device, DXGI_FORMAT viewForma
 
 	device->CreateDepthStencilView(resource, &dsvDesc, mCpuDescriptorHandle);
 
-	mCpuDescriptorHandle.Offset(1, mDsvDescriptorSize);
+	mCpuDescriptorHandle.Offset(1, descriptorSize);
 
 	mDescriptorCount++;
 }
@@ -143,16 +129,16 @@ void CbvDescriptor::CreateDescriptorHeap(ID3D12Device* device, UINT descriptorCo
 	mGpuDescriptorHandle = CD3DX12_GPU_DESCRIPTOR_HANDLE(mDescriptorHeap->GetGPUDescriptorHandleForHeapStart());
 }
 
-void CbvDescriptor::CreateDescriptor(ID3D12Device* device, DXGI_FORMAT viewFormat,
+void CbvDescriptor::CreateDescriptor(ID3D12Device* device, UINT descriptorSize, DXGI_FORMAT viewFormat,
 	ID3D12Resource* resource, ID3D12Resource* counterResource, UINT byteSize)
 {
 	D3D12_CONSTANT_BUFFER_VIEW_DESC cbvDesc;
-	cbvDesc.BufferLocation = resource->GetGPUVirtualAddress();
+	cbvDesc.BufferLocation = resource->GetGPUVirtualAddress(); // need to revise
 	cbvDesc.SizeInBytes = byteSize;
 
 	device->CreateConstantBufferView(&cbvDesc, mCpuDescriptorHandle);
 
-	mCpuDescriptorHandle.Offset(1, mCbvSrvUavDescriptorSize);
+	mCpuDescriptorHandle.Offset(1, descriptorSize);
 
 	mDescriptorCount++;
 }
@@ -175,7 +161,7 @@ void SrvDescriptor::CreateDescriptorHeap(ID3D12Device* device, UINT descriptorCo
 	mGpuDescriptorHandle = CD3DX12_GPU_DESCRIPTOR_HANDLE(mDescriptorHeap->GetGPUDescriptorHandleForHeapStart());
 }
 
-void SrvDescriptor::CreateDescriptor(ID3D12Device* device, DXGI_FORMAT viewFormat,
+void SrvDescriptor::CreateDescriptor(ID3D12Device* device, UINT descriptorSize, DXGI_FORMAT viewFormat,
 	ID3D12Resource* resource, ID3D12Resource* counterResource, UINT byteSize)
 {
 	D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc;
@@ -198,7 +184,7 @@ void SrvDescriptor::CreateDescriptor(ID3D12Device* device, DXGI_FORMAT viewForma
 
 	device->CreateShaderResourceView(resource, &srvDesc, mCpuDescriptorHandle);
 
-	mCpuDescriptorHandle.Offset(1, mCbvSrvUavDescriptorSize);
+	mCpuDescriptorHandle.Offset(1, descriptorSize);
 
 	mDescriptorCount++;
 }
@@ -221,7 +207,7 @@ void UavDescriptor::CreateDescriptorHeap(ID3D12Device* device, UINT descriptorCo
 	mGpuDescriptorHandle = CD3DX12_GPU_DESCRIPTOR_HANDLE(mDescriptorHeap->GetGPUDescriptorHandleForHeapStart());
 }
 
-void UavDescriptor::CreateDescriptor(ID3D12Device* device, DXGI_FORMAT viewFormat,
+void UavDescriptor::CreateDescriptor(ID3D12Device* device, UINT descriptorSize,DXGI_FORMAT viewFormat,
 	ID3D12Resource* resource, ID3D12Resource* counterResource, UINT byteSize)
 {
 	D3D12_UNORDERED_ACCESS_VIEW_DESC uavDesc;
@@ -240,7 +226,7 @@ void UavDescriptor::CreateDescriptor(ID3D12Device* device, DXGI_FORMAT viewForma
 
 	device->CreateUnorderedAccessView(resource, counterResource, &uavDesc, mCpuDescriptorHandle);
 
-	mCpuDescriptorHandle.Offset(1, mCbvSrvUavDescriptorSize);
+	mCpuDescriptorHandle.Offset(1, descriptorSize);
 
 	mDescriptorCount++;
 }

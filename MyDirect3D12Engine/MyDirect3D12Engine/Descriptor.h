@@ -7,20 +7,17 @@ public:
 	Descriptor(ResourceDimension resourceDimension);
 	virtual ~Descriptor() = default;
 
-	void SetDescriptorSizes(ID3D12Device* device);
-
-	UINT GetRtvDescriptorSize();
-	UINT GetDsvDescriptorSize();
-	UINT GetCbvSrvUavDescriptorSize();
-
 	ID3D12DescriptorHeap* GetDescriptorHeap();
-	CD3DX12_CPU_DESCRIPTOR_HANDLE GetCPUDescriptorHandle();
-	CD3DX12_GPU_DESCRIPTOR_HANDLE GetGPUDescriptorHandle();
+	CD3DX12_CPU_DESCRIPTOR_HANDLE GetStartCPUDescriptorHandle();
+	CD3DX12_GPU_DESCRIPTOR_HANDLE GetStartGPUDescriptorHandle();
+
+	void ResetDescriptorHeap();
 
 	virtual void CreateDescriptorHeap(ID3D12Device* device, UINT descriptorCount) = 0;
 
-	virtual void CreateDescriptor(ID3D12Device* device, DXGI_FORMAT viewFormat,
-		ID3D12Resource* resource = nullptr, ID3D12Resource* counterResource = nullptr, UINT byteSize = 0) = 0;
+	virtual void CreateDescriptor(ID3D12Device* device, UINT descriptorSize,
+		DXGI_FORMAT viewFormat = DXGI_FORMAT_UNKNOWN, ID3D12Resource* resource = nullptr, 
+		ID3D12Resource* counterResource = nullptr, UINT byteSize = 0) = 0;
 protected:
 	Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> mDescriptorHeap = nullptr;
 
@@ -28,11 +25,6 @@ protected:
 	CD3DX12_GPU_DESCRIPTOR_HANDLE mGpuDescriptorHandle;
 	UINT mDescriptorCount = 0;
 	ResourceDimension mResourceDimension;
-
-
-	UINT mRtvDescriptorSize = 0;
-	UINT mDsvDescriptorSize = 0;
-	UINT mCbvSrvUavDescriptorSize = 0;
 };
 
 class RtvDescriptor : public Descriptor
@@ -42,7 +34,7 @@ public:
 	
 	virtual void CreateDescriptorHeap(ID3D12Device* device, UINT descriptorCount) override;
 
-	virtual void CreateDescriptor(ID3D12Device* device, DXGI_FORMAT viewFormat, 
+	virtual void CreateDescriptor(ID3D12Device* device, UINT descriptorSize, DXGI_FORMAT viewFormat,
 		ID3D12Resource* resource, ID3D12Resource* counterResource, UINT byteSize) override;
 };
 
@@ -53,7 +45,7 @@ public:
 
 	virtual void CreateDescriptorHeap(ID3D12Device* device, UINT descriptorCount) override;
 
-	virtual void CreateDescriptor(ID3D12Device* device, DXGI_FORMAT viewFormat, 
+	virtual void CreateDescriptor(ID3D12Device* device, UINT descriptorSize, DXGI_FORMAT viewFormat,
 		ID3D12Resource* resource, ID3D12Resource* counterResource, UINT byteSize) override;
 };
 
@@ -64,7 +56,7 @@ public:
 
 	virtual void CreateDescriptorHeap(ID3D12Device* device, UINT descriptorCount) override;
 
-	virtual void CreateDescriptor(ID3D12Device* device, DXGI_FORMAT viewFormat, 
+	virtual void CreateDescriptor(ID3D12Device* device, UINT descriptorSize, DXGI_FORMAT viewFormat,
 		ID3D12Resource* resource, ID3D12Resource* counterResource, UINT byteSize) override;
 };
 
@@ -75,7 +67,7 @@ public:
 
 	virtual void CreateDescriptorHeap(ID3D12Device* device, UINT descriptorCount) override;
 
-	virtual void CreateDescriptor(ID3D12Device* device, DXGI_FORMAT viewFormat, 
+	virtual void CreateDescriptor(ID3D12Device* device, UINT descriptorSize, DXGI_FORMAT viewFormat,
 		ID3D12Resource* resource, ID3D12Resource* counterResource, UINT byteSize) override;
 };
 
@@ -86,6 +78,6 @@ public:
 
 	virtual void CreateDescriptorHeap(ID3D12Device* device, UINT descriptorCount) override;
 
-	virtual void CreateDescriptor(ID3D12Device* device, DXGI_FORMAT viewFormat, 
+	virtual void CreateDescriptor(ID3D12Device* device, UINT descriptorSize, DXGI_FORMAT viewFormat,
 		ID3D12Resource* resource, ID3D12Resource* counterResource, UINT byteSize) override;
 };

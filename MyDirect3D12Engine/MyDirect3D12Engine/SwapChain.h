@@ -13,9 +13,14 @@ public:
 
 	void ResizeBackBuffers(UINT width, UINT height);
 
+	IDXGISwapChain* GetSwapChain();
 	UINT GetBackBufferCount();
 	DXGI_FORMAT GetBackBufferFormat();
-	Microsoft::WRL::ComPtr<ID3D12Resource> GetCurrentBackBuffer(UINT currentBackBufferIndex);
+	ID3D12Resource* GetBackBuffer(UINT backBufferIndex);
+	ID3D12Resource* GetCurrentBackBuffer();
+	UINT GetCurrentBackBufferIndex();
+
+	void SwitchBackBuffer();
 private:
 	Microsoft::WRL::ComPtr<IDXGISwapChain> mSwapChain;
 

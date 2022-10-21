@@ -58,10 +58,16 @@ void SwapChain::ResizeBackBuffers(UINT width, UINT height)
 		mBackBufferFormat,
 		DXGI_SWAP_CHAIN_FLAG_ALLOW_MODE_SWITCH);
 
+	mCurrentBackBuffer = 0;
+
 	for (UINT i = 0; i < mBackBufferCount; i++)
 		ThrowIfFailed(mSwapChain->GetBuffer(i, IID_PPV_ARGS(&mBackBuffers[i])));
 }
 
+IDXGISwapChain* SwapChain::GetSwapChain()
+{
+	return mSwapChain.Get();
+}
 UINT SwapChain::GetBackBufferCount()
 {
 	return mBackBufferCount;
@@ -70,7 +76,23 @@ DXGI_FORMAT SwapChain::GetBackBufferFormat()
 {
 	return mBackBufferFormat;
 }
-Microsoft::WRL::ComPtr<ID3D12Resource> SwapChain::GetCurrentBackBuffer(UINT currentBackBufferIndex)
+ID3D12Resource* SwapChain::GetBackBuffer(UINT backBufferIndex)
 {
-	return mBackBuffers[currentBackBufferIndex];
+	if (backBufferIndex < 0 || backBufferIndex >= mBackBufferCount)
+		return nullptr;
+
+	return mBackBuffers[backBufferIndex].Get();
+}
+ID3D12Resource* SwapChain::GetCurrentBackBuffer()
+{
+	return mBackBuffers[mCurrentBackBuffer].Get();
+}
+UINT SwapChain::GetCurrentBackBufferIndex()
+{
+	return mCurrentBackBuffer;
+}
+
+void SwapChain::SwitchBackBuffer()
+{
+	mCurrentBackBuffer = (mCurrentBackBuffer + 1) % mBackBufferCount;
 }

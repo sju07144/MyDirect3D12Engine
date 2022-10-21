@@ -1,8 +1,6 @@
 #pragma once
 #include "Utility.h"
 
-
-
 class Mesh
 {
 public:
@@ -16,6 +14,7 @@ public:
 
 	ID3D12Resource* GetIndexBuffer();
 	D3D12_INDEX_BUFFER_VIEW GetIndexBufferView();
+	UINT GetIndexCount();
 private:
 	void CreateVertexBuffer(ID3D12Device* device, ID3D12GraphicsCommandList* commandList);
 	void CreateIndexBuffer(ID3D12Device* device, ID3D12GraphicsCommandList* commandList);
@@ -25,7 +24,7 @@ private:
 
 	std::vector<uint32_t> mIndices;
 	UINT indexByteSize = 0;
-	DXGI_FORMAT indexFormat = DXGI_FORMAT_R16_UINT;
+	DXGI_FORMAT indexFormat = DXGI_FORMAT_R32_UINT;
 
 	Microsoft::WRL::ComPtr<ID3D12Resource> mVertexBuffer = nullptr;
 	Microsoft::WRL::ComPtr<ID3D12Resource> mVertexBufferUpload = nullptr;

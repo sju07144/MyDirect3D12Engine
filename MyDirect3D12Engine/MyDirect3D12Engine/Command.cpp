@@ -30,6 +30,8 @@ void Command::CreateGraphicsCommandList(ID3D12Device* device)
 		mCommandAllocator.Get(), nullptr, IID_PPV_ARGS(&mCommandList)));
 
 	mCommandList->Close(); // close before use.
+
+	mCommandList->Reset(mCommandAllocator.Get(), nullptr);
 }
 
 ID3D12CommandAllocator* Command::GetCommandAllocator()

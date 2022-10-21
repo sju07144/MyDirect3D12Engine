@@ -1,7 +1,6 @@
 #include "DepthStencil.h"
 
 void DepthStencil::CreateDepthStencilBuffer(ID3D12Device* device,
-	ID3D12GraphicsCommandList* commandList,
 	UINT width, UINT height,
 	bool _4xMsaaState, UINT _4xMsaaQuality)
 {
@@ -27,12 +26,9 @@ void DepthStencil::CreateDepthStencilBuffer(ID3D12Device* device,
 		&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT),
 		D3D12_HEAP_FLAG_NONE,
 		&depthStencilBufferDesc,
-		D3D12_RESOURCE_STATE_COMMON,
+		D3D12_RESOURCE_STATE_DEPTH_WRITE,
 		&optClear,
 		IID_PPV_ARGS(&mDepthStencilBuffer)));
-
-	commandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(mDepthStencilBuffer.Get(),
-		D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_DEPTH_WRITE));
 }
 
 void DepthStencil::ResetDepthStencilBuffer()

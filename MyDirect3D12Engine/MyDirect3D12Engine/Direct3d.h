@@ -10,10 +10,15 @@ public:
 
 	void WaitForPreviousFrame(ID3D12CommandQueue* commandQueue);
 
+	void SetDescriptorSize();
+
 	IDXGIFactory4* GetFactory();
 	ID3D12Device* GetDevice();
 	ID3D12Fence* GetFence();
 
+	UINT GetRtvDescriptorSize();
+	UINT GetDsvDescriptorSize();
+	UINT GetCbvSrvUavDescriptorSize();
 private:
 	void CreateFactory();
 	void CreateDevice();
@@ -30,4 +35,8 @@ private:
 
 	Microsoft::WRL::ComPtr<ID3D12Fence> mFence = nullptr;
 	UINT64 mCurrentFenceValue = 0;
+
+	UINT mRtvDescriptorSize = 0;
+	UINT mDsvDescriptorSize = 0;
+	UINT mCbvSrvUavDescriptorSize = 0;
 };

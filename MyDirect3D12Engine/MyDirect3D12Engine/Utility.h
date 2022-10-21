@@ -1,13 +1,15 @@
 #pragma once
+#include <Windows.h>
+#include <Windowsx.h>
+#include <d3dx12.h>
 #include <comdef.h>
 #include <d3d12.h>
 #include <d3dcompiler.h>
-#include <d3dx12.h>
 #include <DirectXCollision.h>
+#include <DirectXColors.h>
 #include <DirectXMath.h>
 #include <DirectXPackedVector.h>
 #include <dxgi1_4.h>
-#include <Windows.h>
 #include <wrl.h>
 #include <array>
 #include <cassert>
@@ -53,7 +55,7 @@ class DxException
 {
 public:
 	DxException() = default;
-	DxException(HRESULT hr, const std::wstring & functionName, const std::wstring & filename, int lineNumber);
+	DxException(HRESULT hr, const std::wstring& functionName, const std::wstring& filename, int lineNumber);
 
 	std::wstring ToString()const;
 
@@ -89,22 +91,28 @@ enum class ResourceDimension
 	textureCubeArray
 };
 
+enum class DescriptorType : int
+{
+	rtv = 0,
+	dsv,
+	cbv,
+	srv,
+	uav
+};
+
 struct Vertex
 {
 	Vertex() = default;
 	Vertex(float px, float py, float pz, 
 		float nx, float ny, float nz, 
-		float tx, float ty, float tz, 
 		float u, float v)
-		: position(XMFLOAT3(px, py, pz)),
-		normal(XMFLOAT3(nx, ny, nz)),
-		tangent(XMFLOAT3(tx, ty, tz)),
-		texCoord(XMFLOAT2(u, v))
+		: position(DirectX::XMFLOAT3(px, py, pz)),
+		normal(DirectX::XMFLOAT3(nx, ny, nz)),
+		texCoord(DirectX::XMFLOAT2(u, v))
 	{ }
 
 	DirectX::XMFLOAT3 position;
 	DirectX::XMFLOAT3 normal;
-	DirectX::XMFLOAT3 tangent;
 	DirectX::XMFLOAT2 texCoord;
 };
 
@@ -117,4 +125,12 @@ public:
 		const void* initData,
 		UINT byteSize,
 		Microsoft::WRL::ComPtr<ID3D12Resource>& uploadBuffer);
+
+	static UINT CalculateConstantBufferSize(UINT size);
+};
+
+class MathUtility
+{
+public:
+	static const float PI;
 };

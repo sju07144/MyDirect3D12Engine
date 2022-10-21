@@ -1,5 +1,7 @@
 #include "Utility.h"
 
+const float MathUtility::PI = 3.14159265359f;
+
 DxException::DxException(HRESULT hr, const std::wstring& functionName, const std::wstring& filename, int lineNumber) :
     ErrorCode(hr),
     FunctionName(functionName),
@@ -39,7 +41,7 @@ Microsoft::WRL::ComPtr<ID3D12Resource> D3D12Utility::CreateDefaultBuffer(
 		&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD),
 		D3D12_HEAP_FLAG_NONE,
 		&CD3DX12_RESOURCE_DESC::Buffer(byteSize),
-		D3D12_RESOURCE_STATE_COPY_DEST,
+		D3D12_RESOURCE_STATE_GENERIC_READ,
 		nullptr,
 		IID_PPV_ARGS(&uploadBuffer)));
 
@@ -52,7 +54,13 @@ Microsoft::WRL::ComPtr<ID3D12Resource> D3D12Utility::CreateDefaultBuffer(
 		D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_COPY_DEST));
 	UpdateSubresources<1>(commandList, defaultBuffer.Get(), uploadBuffer.Get(), 0, 0, 1, &subResource);
 	commandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(defaultBuffer.Get(),
-		D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_GENERIC_READ));
+		D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_GENERIC_READ));
 
 	return defaultBuffer;
+}
+
+UINT D3D12Utility::CalculateConstantBufferSize(UINT size)
+{
+	// Constant buffer size must be multiple of 256 byte.
+	return (size + 255) & ~255;
 }

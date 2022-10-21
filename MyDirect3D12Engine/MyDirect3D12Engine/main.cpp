@@ -8,6 +8,8 @@ int APIENTRY WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR cmdline
 	try
 	{
 		renderer.Initialize();
+
+		return renderer.RenderLoop();
 	}
 	catch (const DxException& e)
 	{
