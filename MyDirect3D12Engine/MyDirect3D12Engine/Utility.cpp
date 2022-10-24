@@ -49,7 +49,7 @@ Microsoft::WRL::ComPtr<ID3D12Resource> D3D12Utility::CreateDefaultBuffer(
 	subResource.pData = initData;
 	subResource.RowPitch = byteSize;
 	subResource.SlicePitch = subResource.RowPitch;
-
+	
 	commandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(defaultBuffer.Get(),
 		D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_COPY_DEST));
 	UpdateSubresources<1>(commandList, defaultBuffer.Get(), uploadBuffer.Get(), 0, 0, 1, &subResource);

@@ -28,14 +28,14 @@ Renderer::Renderer(HINSTANCE hInstance)
 	mDescriptors[DescriptorType::srv] = std::make_unique<SrvDescriptor>(ResourceDimension::texture2D);
 	mDescriptors[DescriptorType::uav] = std::make_unique<UavDescriptor>(ResourceDimension::texture2D);
 
-	float aspectRatio = static_cast<float>(mViewportWidth) / static_cast<float>(mViewportHeight);
+	float aspectRatio = static_cast<float>(mViewportWidth) / mViewportHeight;
 
 	mCamera->LookAt(
-		6.0f, 8.0f, 6.0f,
+		0.0f, 0.0f, -4.0f,
 		0.0f, 0.0f, 0.0f,
 		0.0f, 1.0f, 0.0f);
 
-	mCamera->SetLens(0.25f * MathUtility::PI, aspectRatio, 1.0f, 1000.0f);
+	mCamera->SetLens(0.25f * XM_PI, aspectRatio, 1.0f, 1000.0f);
 }
 Renderer::~Renderer()
 {
@@ -98,7 +98,9 @@ void Renderer::Initialize()
 	// Create box
 	BasicGeometryGenerator geoGenerator;
 	std::unique_ptr<Mesh> box = std::make_unique<Mesh>(geoGenerator.CreateBox(2.0f, 2.0f, 2.0f));
+	PIXBeginEvent(commandList, 0, "Configure mesh data!");
 	box->ConfigureMesh(device, commandList);
+	PIXEndEvent(commandList);
 	mMeshes.insert({ "box", std::move(box) });
 
 	// Initialize constant buffer
@@ -124,6 +126,7 @@ void Renderer::Initialize()
 	ExecuteCommandLists(commandList, commandQueue);
 
 	mDirect3D->WaitForPreviousFrame(commandQueue);
+
 }
 
 int Renderer::RenderLoop()
@@ -395,7 +398,7 @@ void Renderer::MouseMove(WPARAM btnState, int x, int y)
 		float dx = XMConvertToRadians(0.25f * static_cast<float>(x - mLastMousePos.x));
 		float dy = XMConvertToRadians(0.25f * static_cast<float>(y - mLastMousePos.y));
 
-		mCamera->RotateX(dy);
+		mCamera->Pitch(dy);
 		mCamera->RotateY(dx);
 	}
 
@@ -421,10 +424,20 @@ void Renderer::ProcessKeyboardInput()
 }
 void Renderer::UpdateData()
 {
+	XMFLOAT4X4 view = mCamera->GetView();
+	XMFLOAT4X4 proj = mCamera->GetProj();
+
+	XMMATRIX w = XMMatrixIdentity();
+	XMMATRIX v = XMLoadFloat4x4(&view);
+	XMMATRIX p = XMLoadFloat4x4(&proj);
+
 	ObjectConstant objConstant;
 	XMStoreFloat4x4(&objConstant.world, XMMatrixIdentity());
 	objConstant.view = mCamera->GetView();
 	objConstant.proj = mCamera->GetProj();
+	
+	XMMATRIX wvp = w * v * p;
+	XMStoreFloat4x4(&objConstant.worldViewProj, XMMatrixTranspose(wvp));
 
 	mObjectCBs->CopyData(0, objConstant);
 }
@@ -441,9 +454,6 @@ void Renderer::DrawScene()
 
 	ThrowIfFailed(commandList->Reset(commandAllocator, mPSOs["opaque"].Get()));
 
-	PIXBeginEvent(commandQueue, 120, "OK");
-	PIXBeginEvent(commandList, 120, "OK");
-
 	commandList->RSSetScissorRects(1, &mScissorRect);
 	commandList->RSSetViewports(1, &mScreenViewport);
 
@@ -457,7 +467,7 @@ void Renderer::DrawScene()
 	commandList->ClearDepthStencilView(mDescriptors[DescriptorType::dsv]->GetStartCPUDescriptorHandle(), 
 		D3D12_CLEAR_FLAG_DEPTH | D3D12_CLEAR_FLAG_STENCIL, 1.0f, 0, 0, nullptr);
 
-	commandList->OMSetRenderTargets(1, &currentRenderTargetView, false, &mDescriptors[DescriptorType::dsv]->GetStartCPUDescriptorHandle());
+	commandList->OMSetRenderTargets(1, &currentRenderTargetView, true, &mDescriptors[DescriptorType::dsv]->GetStartCPUDescriptorHandle());
 
 	ID3D12DescriptorHeap* descriptorHeaps[] = { mDescriptors[DescriptorType::cbv]->GetDescriptorHeap() };
 	commandList->SetDescriptorHeaps(_countof(descriptorHeaps), descriptorHeaps);
@@ -479,13 +489,12 @@ void Renderer::DrawScene()
 
 	ExecuteCommandLists(commandList, commandQueue);
 
+	PIXBeginEvent(commandQueue, 0, "Present the back buffer!");
 	ThrowIfFailed(mSwapChain->GetSwapChain()->Present(0, 0));
 	mSwapChain->SwitchBackBuffer();
+	PIXEndEvent(commandQueue);
 
 	mDirect3D->WaitForPreviousFrame(commandQueue);
-
-	PIXEndEvent(commandList);
-	PIXEndEvent(commandQueue);
 }
 
 void Renderer::EnableDebugLayer()
@@ -569,7 +578,8 @@ void Renderer::CreatePSO(ID3D12Device* device, const std::string& psoName,
 {
 	PipelineStateObject pso = nullptr;
 
-	D3D12_GRAPHICS_PIPELINE_STATE_DESC psoDesc{};
+	D3D12_GRAPHICS_PIPELINE_STATE_DESC psoDesc;
+	ZeroMemory(&psoDesc, sizeof(D3D12_GRAPHICS_PIPELINE_STATE_DESC));
 	psoDesc.BlendState = CD3DX12_BLEND_DESC(D3D12_DEFAULT);
 	psoDesc.DepthStencilState = CD3DX12_DEPTH_STENCIL_DESC(D3D12_DEFAULT);
 	psoDesc.DSVFormat = mDepthStencil->GetDepthStencilBufferFormat();
@@ -583,6 +593,7 @@ void Renderer::CreatePSO(ID3D12Device* device, const std::string& psoName,
 	psoDesc.RTVFormats[0] = mSwapChain->GetBackBufferFormat();
 	psoDesc.SampleDesc.Count = m4xMsaaState ? 4 : 1;
 	psoDesc.SampleDesc.Quality = m4xMsaaState ? (m4xMsaaQuality - 1) : 0;
+	psoDesc.SampleMask = UINT_MAX;
 	
 	ThrowIfFailed(device->CreateGraphicsPipelineState(&psoDesc, IID_PPV_ARGS(&pso)));
 	

@@ -35,7 +35,7 @@ public:
 	void Strafe(float distance);
 	void Walk(float distance);
 
-	void RotateX(float angle);
+	void Pitch(float angle);
 	void RotateY(float angle);
 private:
 	void UpdateViewMatrix();

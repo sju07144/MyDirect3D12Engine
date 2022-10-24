@@ -19,6 +19,7 @@
 #include <string>
 #include <unordered_map>
 #include <vector>
+#include "pix3.h"
 
 /* inline std::string HrToString(HRESULT hr)
 {

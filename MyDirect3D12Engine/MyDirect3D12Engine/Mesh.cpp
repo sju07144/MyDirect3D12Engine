@@ -52,5 +52,4 @@ void Mesh::CreateIndexBuffer(ID3D12Device* device, ID3D12GraphicsCommandList* co
 	mIndexBufferView.BufferLocation = mIndexBuffer->GetGPUVirtualAddress();
 	mIndexBufferView.Format = indexFormat;
 	mIndexBufferView.SizeInBytes = indexByteSize;
-
 }

@@ -108,7 +108,7 @@ void Camera::Walk(float distance)
 	UpdateViewMatrix();
 }
 
-void Camera::RotateX(float angle)
+void Camera::Pitch(float angle)
 {
 	XMMATRIX rotationMatrix = XMMatrixRotationAxis(XMLoadFloat3(&mRight), angle);
 
@@ -134,16 +134,36 @@ void Camera::UpdateViewMatrix()
 	XMVECTOR right = XMLoadFloat3(&mRight);
 	XMVECTOR up = XMLoadFloat3(&mUp);
 	XMVECTOR look = XMLoadFloat3(&mLook);
+	
+	look = XMVector3Normalize(look);
+	up = XMVector3Normalize(XMVector3Cross(look, right));
+	right = XMVector3Cross(up, look);
 
 	float x = -XMVectorGetX(XMVector3Dot(pos, right));
 	float y = -XMVectorGetX(XMVector3Dot(pos, up));
 	float z = -XMVectorGetX(XMVector3Dot(pos, look));
 
-	XMMATRIX view = XMMatrixSet(
-		mRight.x, mUp.x, mLook.x, 0,
-		mRight.y, mUp.y, mLook.y, 0,
-		mRight.z, mUp.z, mLook.z, 0,
-		x, y, z, 1);
+	XMStoreFloat3(&mRight, right);
+	XMStoreFloat3(&mUp, up);
+	XMStoreFloat3(&mLook, look);
 
-	XMStoreFloat4x4(&mView, view);
+	mView(0, 0) = mRight.x;
+	mView(0, 1) = mUp.x;
+	mView(0, 2) = mLook.x;
+	mView(0, 3) = 0;
+
+	mView(1, 0) = mRight.y;
+	mView(1, 1) = mUp.y;
+	mView(1, 2) = mLook.y;
+	mView(1, 3) = 0;
+
+	mView(2, 0) = mRight.z;
+	mView(2, 1) = mUp.z;
+	mView(2, 2) = mLook.z;
+	mView(2, 3) = 0;
+
+	mView(3, 0) = x;
+	mView(3, 1) = y;
+	mView(3, 2) = z;
+	mView(3, 3) = 1;
 }

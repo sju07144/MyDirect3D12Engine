@@ -6,7 +6,6 @@
 #include "Descriptor.h"
 #include "Direct3d.h"
 #include "Mesh.h"
-#include "pix3.h"
 #include "Shader.h"
 #include "SwapChain.h"
 #include "Timer.h"
@@ -33,6 +32,7 @@ struct ObjectConstant
 	DirectX::XMFLOAT4X4 world;
 	DirectX::XMFLOAT4X4 view;
 	DirectX::XMFLOAT4X4 proj;
+	DirectX::XMFLOAT4X4 worldViewProj;
 };
 
 LRESULT CALLBACK WindowProcedure(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
