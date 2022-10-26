@@ -18,15 +18,13 @@ Renderer::Renderer(HINSTANCE hInstance)
 	mSwapChain(std::make_unique<SwapChain>()),
 	mDepthStencil(std::make_unique<DepthStencil>()),
 	mCamera(std::make_unique<Camera>()),
-	mTimer(std::make_unique<Timer>())
+	mTimer(std::make_unique<Timer>()),
+	mRtvDescriptor(std::make_unique<RtvDescriptor>()),
+	mDsvDescriptor(std::make_unique<DsvDescriptor>()),
+	mCbvSrvUavDescriptor(std::make_unique<CbvSrvUavDescriptor>())
+
 {
 	renderer = this;
-
-	mDescriptors[DescriptorType::rtv] = std::make_unique<RtvDescriptor>(ResourceDimension::texture2D);
-	mDescriptors[DescriptorType::dsv] = std::make_unique<DsvDescriptor>(ResourceDimension::texture2D);
-	mDescriptors[DescriptorType::cbv] = std::make_unique<CbvDescriptor>(ResourceDimension::texture2D);
-	mDescriptors[DescriptorType::srv] = std::make_unique<SrvDescriptor>(ResourceDimension::texture2D);
-	mDescriptors[DescriptorType::uav] = std::make_unique<UavDescriptor>(ResourceDimension::texture2D);
 
 	float aspectRatio = static_cast<float>(mViewportWidth) / mViewportHeight;
 
@@ -39,6 +37,9 @@ Renderer::Renderer(HINSTANCE hInstance)
 }
 Renderer::~Renderer()
 {
+	if (mDirect3D->GetDevice() != nullptr)
+		mDirect3D->WaitForPreviousFrame(mCommand->GetCommandQueue());
+
 	renderer = nullptr;
 }
 
@@ -85,31 +86,39 @@ void Renderer::Initialize()
 		m4xMsaaState, m4xMsaaQuality);
 
 	// Create render target view
-	mDescriptors[DescriptorType::rtv]->CreateDescriptorHeap(device, mSwapChain->GetBackBufferCount());
+	mRtvDescriptor->CreateDescriptorHeap(device, mSwapChain->GetBackBufferCount());
 	for (UINT i = 0; i < mSwapChain->GetBackBufferCount(); i++)
-		mDescriptors[DescriptorType::rtv]->CreateDescriptor(device, mDirect3D->GetRtvDescriptorSize(),
-			backBufferFormat, mSwapChain->GetBackBuffer(i));
+		mRtvDescriptor->CreateRenderTargetView(device, mDirect3D->GetRtvDescriptorSize(), mSwapChain->GetBackBuffer(i));
 
 	// Create depth stencil view
-	mDescriptors[DescriptorType::dsv]->CreateDescriptorHeap(device, 1);
-	mDescriptors[DescriptorType::dsv]->CreateDescriptor(device, mDirect3D->GetDsvDescriptorSize(),
-		mDepthStencil->GetDepthStencilBufferFormat(), mDepthStencil->GetDepthStencilBuffer());
+	mDsvDescriptor->CreateDescriptorHeap(device, 1);
+	mDsvDescriptor->CreateDepthStencilView(device, mDirect3D->GetDsvDescriptorSize(),
+		mDepthStencil->GetDepthStencilBufferFormat(), D3D12_DSV_DIMENSION_TEXTURE2D, 
+		mDepthStencil->GetDepthStencilBuffer());
 
 	// Create box
 	BasicGeometryGenerator geoGenerator;
 	std::unique_ptr<Mesh> box = std::make_unique<Mesh>(geoGenerator.CreateBox(2.0f, 2.0f, 2.0f));
-	PIXBeginEvent(commandList, 0, "Configure mesh data!");
 	box->ConfigureMesh(device, commandList);
-	PIXEndEvent(commandList);
 	mMeshes.insert({ "box", std::move(box) });
 
 	// Initialize constant buffer
-	mObjectCBs = std::make_unique<UploadBuffer<ObjectConstant>>(device, 1, true);
+	mObjectCBs = std::make_unique<UploadBuffer<ObjectConstant>>(device, 2, true);
+	mSceneCBs = std::make_unique<UploadBuffer<SceneConstant>>(device, 1, true);
 
-	// Create descriptor heap and constant buffer view
-	mDescriptors[DescriptorType::cbv]->CreateDescriptorHeap(device, 1);
-	mDescriptors[DescriptorType::cbv]->CreateDescriptor(device, mDirect3D->GetCbvSrvUavDescriptorSize(),
-		DXGI_FORMAT_UNKNOWN, mObjectCBs->GetUploadBuffer(), nullptr, mObjectCBs->GetElementByteSize());
+	// Create descriptor heap
+	mCbvSrvUavDescriptor->CreateDescriptorHeap(device, 2);
+
+	// Load Textures
+	LoadTextures();
+
+	// Create descriptor heap and shader resource view
+	auto woodTexture = mTextures["wood"]->GetTextureResource();
+	mCbvSrvUavDescriptor->CreateShaderResourceView(device, mDirect3D->GetCbvSrvUavDescriptorSize(),
+		woodTexture->GetDesc().Format, D3D12_SRV_DIMENSION_TEXTURE2D, woodTexture);
+	auto trinketTexture = mTextures["trinket"]->GetTextureResource();
+	mCbvSrvUavDescriptor->CreateShaderResourceView(device, mDirect3D->GetCbvSrvUavDescriptorSize(),
+		trinketTexture->GetDesc().Format, D3D12_SRV_DIMENSION_TEXTURE2D, trinketTexture);
 
 	// Create vertex and pixel shader
 	std::unique_ptr<Shader> vertexShader = std::make_unique<Shader>();
@@ -123,10 +132,11 @@ void Renderer::Initialize()
 	CreateRootSignature(device, "default");
 	CreatePSO(device, "opaque", "default", "opaque");
 
+	BuildRenderItems();
+
 	ExecuteCommandLists(commandList, commandQueue);
 
 	mDirect3D->WaitForPreviousFrame(commandQueue);
-
 }
 
 int Renderer::RenderLoop()
@@ -353,21 +363,18 @@ void Renderer::Resize()
 	// Resize back buffer
 	mSwapChain->ResizeBackBuffers(mWindowWidth, mWindowHeight);
 	
-	mDescriptors[DescriptorType::rtv]->ResetDescriptorHeap();
+	mRtvDescriptor->ResetDescriptorHeap();
 	for (UINT i = 0; i < mSwapChain->GetBackBufferCount(); i++)
-		mDescriptors[DescriptorType::rtv]->CreateDescriptor(
-			mDirect3D->GetDevice(), mDirect3D->GetRtvDescriptorSize(),
-			mSwapChain->GetBackBufferFormat(), mSwapChain->GetBackBuffer(i));
+		mRtvDescriptor->CreateRenderTargetView(mDirect3D->GetDevice(), mDirect3D->GetRtvDescriptorSize(), mSwapChain->GetBackBuffer(i));
 
 	// Resize depth/stencil buffer
 	mDepthStencil->ResetDepthStencilBuffer();
 	mDepthStencil->CreateDepthStencilBuffer(mDirect3D->GetDevice(),
 		mWindowWidth, mWindowHeight, m4xMsaaState, m4xMsaaQuality);
 
-	mDescriptors[DescriptorType::dsv]->ResetDescriptorHeap();
-	mDescriptors[DescriptorType::dsv]->CreateDescriptor(
-		mDirect3D->GetDevice(), mDirect3D->GetDsvDescriptorSize(),
-		mDepthStencil->GetDepthStencilBufferFormat(), mDepthStencil->GetDepthStencilBuffer());
+	mDsvDescriptor->ResetDescriptorHeap();
+	mDsvDescriptor->CreateDepthStencilView(mDirect3D->GetDevice(), mDirect3D->GetDsvDescriptorSize(),
+		mDepthStencil->GetDepthStencilBufferFormat(), D3D12_DSV_DIMENSION_TEXTURE2D, mDepthStencil->GetDepthStencilBuffer());
 
 	ConfigureViewportAndScissorRect();
 }
@@ -424,22 +431,8 @@ void Renderer::ProcessKeyboardInput()
 }
 void Renderer::UpdateData()
 {
-	XMFLOAT4X4 view = mCamera->GetView();
-	XMFLOAT4X4 proj = mCamera->GetProj();
-
-	XMMATRIX w = XMMatrixIdentity();
-	XMMATRIX v = XMLoadFloat4x4(&view);
-	XMMATRIX p = XMLoadFloat4x4(&proj);
-
-	ObjectConstant objConstant;
-	XMStoreFloat4x4(&objConstant.world, XMMatrixIdentity());
-	objConstant.view = mCamera->GetView();
-	objConstant.proj = mCamera->GetProj();
-	
-	XMMATRIX wvp = w * v * p;
-	XMStoreFloat4x4(&objConstant.worldViewProj, XMMatrixTranspose(wvp));
-
-	mObjectCBs->CopyData(0, objConstant);
+	UpdateObjectConstants();
+	UpdateSceneConstants();
 }
 void Renderer::DrawScene()
 {
@@ -461,40 +454,63 @@ void Renderer::DrawScene()
 		D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_RENDER_TARGET));
 
 	D3D12_CPU_DESCRIPTOR_HANDLE currentRenderTargetView =
-		CD3DX12_CPU_DESCRIPTOR_HANDLE(mDescriptors[DescriptorType::rtv]->GetStartCPUDescriptorHandle(), 
+		CD3DX12_CPU_DESCRIPTOR_HANDLE(mRtvDescriptor->GetStartCPUDescriptorHandle(), 
 		mSwapChain->GetCurrentBackBufferIndex(), mDirect3D->GetRtvDescriptorSize());
 	commandList->ClearRenderTargetView(currentRenderTargetView, Colors::LightSteelBlue, 0, nullptr);
-	commandList->ClearDepthStencilView(mDescriptors[DescriptorType::dsv]->GetStartCPUDescriptorHandle(), 
+	commandList->ClearDepthStencilView(mDsvDescriptor->GetStartCPUDescriptorHandle(), 
 		D3D12_CLEAR_FLAG_DEPTH | D3D12_CLEAR_FLAG_STENCIL, 1.0f, 0, 0, nullptr);
 
-	commandList->OMSetRenderTargets(1, &currentRenderTargetView, true, &mDescriptors[DescriptorType::dsv]->GetStartCPUDescriptorHandle());
+	commandList->OMSetRenderTargets(1, &currentRenderTargetView, true, &mDsvDescriptor->GetStartCPUDescriptorHandle());
 
-	ID3D12DescriptorHeap* descriptorHeaps[] = { mDescriptors[DescriptorType::cbv]->GetDescriptorHeap() };
+	ID3D12DescriptorHeap* descriptorHeaps[] = { mCbvSrvUavDescriptor->GetDescriptorHeap() };
 	commandList->SetDescriptorHeaps(_countof(descriptorHeaps), descriptorHeaps);
 
 	commandList->SetGraphicsRootSignature(mRootSignatures["default"].Get());
 
-	auto vbv = mMeshes["box"]->GetVertexBufferView();
-	auto ibv = mMeshes["box"]->GetIndexBufferView();
-	commandList->IASetVertexBuffers(0, 1, &vbv);
-	commandList->IASetIndexBuffer(&ibv);
-	commandList->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+	auto sceneCBAddress = mSceneCBs->GetUploadBuffer()->GetGPUVirtualAddress();
+	commandList->SetGraphicsRootConstantBufferView(1, sceneCBAddress);
 
-	commandList->SetGraphicsRootDescriptorTable(0, mDescriptors[DescriptorType::cbv]->GetStartGPUDescriptorHandle());
-
-	commandList->DrawIndexedInstanced(mMeshes["box"]->GetIndexCount(), 1, 0, 0, 0);
+	DrawRenderItems(commandList);
 
 	commandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(currentBackBuffer,
 		D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PRESENT));
 
 	ExecuteCommandLists(commandList, commandQueue);
 
-	PIXBeginEvent(commandQueue, 0, "Present the back buffer!");
 	ThrowIfFailed(mSwapChain->GetSwapChain()->Present(0, 0));
 	mSwapChain->SwitchBackBuffer();
-	PIXEndEvent(commandQueue);
 
 	mDirect3D->WaitForPreviousFrame(commandQueue);
+}
+
+void Renderer::UpdateObjectConstants()
+{
+	ObjectConstant objectConstant;
+	UINT elementIndex = 0;
+
+	for (const auto& renderItem : mRenderItems)
+	{
+		XMMATRIX world = XMLoadFloat4x4(&renderItem.world);
+		XMStoreFloat4x4(&objectConstant.world, XMMatrixTranspose(world));
+
+		mObjectCBs->CopyData(elementIndex, objectConstant);
+		elementIndex++;
+	}
+}
+void Renderer::UpdateSceneConstants()
+{
+	SceneConstant sceneConstant;
+
+	XMFLOAT4X4 view = mCamera->GetView();
+	XMFLOAT4X4 proj = mCamera->GetProj();
+
+	XMMATRIX v = XMLoadFloat4x4(&view);
+	XMMATRIX p = XMLoadFloat4x4(&proj);
+
+	XMStoreFloat4x4(&sceneConstant.view, XMMatrixTranspose(v));
+	XMStoreFloat4x4(&sceneConstant.proj, XMMatrixTranspose(p));
+
+	mSceneCBs->CopyData(0, sceneConstant);
 }
 
 void Renderer::EnableDebugLayer()
@@ -548,14 +564,20 @@ void Renderer::CreateRootSignature(ID3D12Device* device, const std::string& root
 {
 	RootSignature rootSignature = nullptr;
 
-	CD3DX12_DESCRIPTOR_RANGE cbvTable;
-	cbvTable.Init(D3D12_DESCRIPTOR_RANGE_TYPE_CBV, 1, 0);
+	CD3DX12_DESCRIPTOR_RANGE texTable;
+	texTable.Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 0);
 
-	CD3DX12_ROOT_PARAMETER slotRootParameters[1];
-	slotRootParameters[0].InitAsDescriptorTable(1, &cbvTable);
+	CD3DX12_ROOT_PARAMETER slotRootParameters[3];
+	// slotRootParameters[0].InitAsDescriptorTable(1, &cbvTable);
+	slotRootParameters[0].InitAsConstantBufferView(0);
+	slotRootParameters[1].InitAsConstantBufferView(1);
+	slotRootParameters[2].InitAsDescriptorTable(1, &texTable, D3D12_SHADER_VISIBILITY_PIXEL);
 
-	CD3DX12_ROOT_SIGNATURE_DESC rootSignatureDesc(1, slotRootParameters,
-		0, nullptr, D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT);
+	auto samplers = Texture::GetStaticSamplers();
+
+	CD3DX12_ROOT_SIGNATURE_DESC rootSignatureDesc(3, slotRootParameters,
+		(UINT)samplers.size(), samplers.data(), 
+		D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT);
 
 	ComPtr<ID3DBlob> serializedRootSignature;
 	ComPtr<ID3DBlob> error;
@@ -598,4 +620,76 @@ void Renderer::CreatePSO(ID3D12Device* device, const std::string& psoName,
 	ThrowIfFailed(device->CreateGraphicsPipelineState(&psoDesc, IID_PPV_ARGS(&pso)));
 	
 	mPSOs.insert({ psoName, pso });
+}
+
+void Renderer::LoadTextures()
+{
+	// cache the d3d12 object
+	auto device = mDirect3D->GetDevice();
+	auto commandList = mCommand->GetCommandList();
+
+	auto woodTexture = std::make_unique<Texture>();
+	std::string texName = "wood";
+
+	woodTexture->CreateTexture(device, commandList, texName.c_str(), L"./Textures/wood.dds");
+
+	mTextures.insert({ texName, std::move(woodTexture) });
+
+	auto trinketTexture = std::make_unique<Texture>();
+	texName = "trinket";
+
+	trinketTexture->CreateTexture(device, commandList, texName.c_str(), L"./Textures/trinket.dds");
+
+	mTextures.insert({ texName, std::move(trinketTexture) });
+}
+
+void Renderer::BuildRenderItems()
+{
+	RenderItem renderItem;
+
+	renderItem.mesh = mMeshes["box"].get();
+	XMMATRIX world = XMMatrixSet(
+		1.0f, 0.0f, 0.0f, 0.0f,
+		0.0f, 1.0f, 0.0f, 0.0f,
+		0.0f, 0.0f, 1.0f, 0.0f,
+		3.0f, 2.0f, 0.0f, 1.0f);
+	XMStoreFloat4x4(&renderItem.world, world);
+	renderItem.objectCBIndex = 0;
+	renderItem.diffuseMapIndex = 0;
+	mRenderItems.push_back(renderItem);
+
+	renderItem.mesh = mMeshes["box"].get();
+	world = XMMatrixSet(
+		1.0f, 0.0f, 0.0f, 0.0f,
+		0.0f, 1.0f, 0.0f, 0.0f,
+		0.0f, 0.0f, 1.0f, 0.0f,
+		-3.0f, -2.0f, 0.0f, 1.0f);
+	XMStoreFloat4x4(&renderItem.world, world);
+	renderItem.objectCBIndex = 1;
+	renderItem.diffuseMapIndex = 1;
+	mRenderItems.push_back(renderItem);
+}
+void Renderer::DrawRenderItems(ID3D12GraphicsCommandList* commandList)
+{
+	UINT objectCBbyteSize = D3D12Utility::CalculateConstantBufferSize(sizeof(ObjectConstant));
+	UINT cbvSrvUavDescriptorSize = mDirect3D->GetCbvSrvUavDescriptorSize();
+
+	for (const auto& renderItem : mRenderItems)
+	{
+		auto vbv = renderItem.mesh->GetVertexBufferView();
+		auto ibv = renderItem.mesh->GetIndexBufferView();
+		commandList->IASetVertexBuffers(0, 1, &vbv);
+		commandList->IASetIndexBuffer(&ibv);
+		commandList->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+
+		auto objectCBAddress = mObjectCBs->GetUploadBuffer()->GetGPUVirtualAddress();
+		objectCBAddress += renderItem.objectCBIndex * objectCBbyteSize;
+		commandList->SetGraphicsRootConstantBufferView(0, objectCBAddress);
+
+		CD3DX12_GPU_DESCRIPTOR_HANDLE cbvSrvUavDescriptor(mCbvSrvUavDescriptor->GetStartGPUDescriptorHandle());
+		cbvSrvUavDescriptor.Offset(renderItem.diffuseMapIndex, mDirect3D->GetCbvSrvUavDescriptorSize());
+		commandList->SetGraphicsRootDescriptorTable(2, cbvSrvUavDescriptor);
+
+		commandList->DrawIndexedInstanced((renderItem.mesh)->GetIndexCount(), 1, 0, 0, 0);
+	}
 }

@@ -7,9 +7,12 @@
 #include "Direct3d.h"
 #include "Mesh.h"
 #include "Shader.h"
+#include "Stdafx.h"
 #include "SwapChain.h"
+#include "Texture.h"
 #include "Timer.h"
 #include "UploadBuffer.h"
+#include "Utility.h"
 
 using RootSignature = Microsoft::WRL::ComPtr<ID3D12RootSignature>;
 using PipelineStateObject = Microsoft::WRL::ComPtr<ID3D12PipelineState>;
@@ -27,12 +30,23 @@ struct EnumHash
 	}
 };
 
+struct RenderItem
+{
+	Mesh* mesh = nullptr;
+	DirectX::XMFLOAT4X4 world;
+	UINT objectCBIndex = -1;
+	UINT diffuseMapIndex = -1;
+};
+
 struct ObjectConstant
 {
 	DirectX::XMFLOAT4X4 world;
+};
+
+struct SceneConstant
+{
 	DirectX::XMFLOAT4X4 view;
 	DirectX::XMFLOAT4X4 proj;
-	DirectX::XMFLOAT4X4 worldViewProj;
 };
 
 LRESULT CALLBACK WindowProcedure(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
@@ -68,6 +82,9 @@ private:
 	void UpdateData();
 	void DrawScene();
 
+	void UpdateObjectConstants();
+	void UpdateSceneConstants();
+
 	void EnableDebugLayer();
 	void CheckMultiSamplingSupport(ID3D12Device* device, DXGI_FORMAT backBufferFormat);
 	void ConfigureViewportAndScissorRect();
@@ -77,6 +94,10 @@ private:
 	void CreatePSO(ID3D12Device* device, const std::string& psoName, 
 		const std::string& rootSignatureName, const std::string& shaderName);
 
+	void LoadTextures();
+
+	void BuildRenderItems();
+	void DrawRenderItems(ID3D12GraphicsCommandList* commandList);
 private:
 	// Window size variables.
 	UINT mWindowWidth;
@@ -93,11 +114,15 @@ private:
 	std::unique_ptr<SwapChain> mSwapChain;
 	std::unique_ptr<DepthStencil> mDepthStencil;
 
-	std::unordered_map<DescriptorType, std::unique_ptr<Descriptor>, EnumHash> mDescriptors;
+	std::unique_ptr<RtvDescriptor> mRtvDescriptor;
+	std::unique_ptr<DsvDescriptor> mDsvDescriptor;
+	std::unique_ptr<CbvSrvUavDescriptor> mCbvSrvUavDescriptor;
+
 	std::unordered_map<std::string, std::unique_ptr<Shader>> mShaders;
 
 	std::unordered_map<std::string, RootSignature> mRootSignatures; // default count is 1
 	std::unordered_map<std::string, PipelineStateObject> mPSOs; // default count is 1
+
 	std::vector<InputElement> mInputLayout;
 
 	std::unique_ptr<Camera> mCamera;
@@ -105,8 +130,12 @@ private:
 	std::unique_ptr<Timer> mTimer;
 
 	std::unordered_map<std::string, std::unique_ptr<Mesh>> mMeshes;
+	std::unordered_map<std::string, std::unique_ptr<Texture>> mTextures;
 
 	std::unique_ptr<UploadBuffer<ObjectConstant>> mObjectCBs = nullptr;
+	std::unique_ptr<UploadBuffer<SceneConstant>> mSceneCBs = nullptr;
+
+	std::vector<RenderItem> mRenderItems;
 
 	POINT mLastMousePos = { 0, 0 };
 

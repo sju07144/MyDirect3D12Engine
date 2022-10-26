@@ -1,10 +1,11 @@
 #pragma once
+#include "Stdafx.h"
 #include "Utility.h"
 
 class Descriptor
 {
 public:
-	Descriptor(ResourceDimension resourceDimension);
+	Descriptor() = default;
 	virtual ~Descriptor() = default;
 
 	ID3D12DescriptorHeap* GetDescriptorHeap();
@@ -15,69 +16,51 @@ public:
 
 	virtual void CreateDescriptorHeap(ID3D12Device* device, UINT descriptorCount) = 0;
 
-	virtual void CreateDescriptor(ID3D12Device* device, UINT descriptorSize,
-		DXGI_FORMAT viewFormat = DXGI_FORMAT_UNKNOWN, ID3D12Resource* resource = nullptr, 
-		ID3D12Resource* counterResource = nullptr, UINT byteSize = 0) = 0;
 protected:
 	Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> mDescriptorHeap = nullptr;
 
 	CD3DX12_CPU_DESCRIPTOR_HANDLE mCpuDescriptorHandle;
 	CD3DX12_GPU_DESCRIPTOR_HANDLE mGpuDescriptorHandle;
 	UINT mDescriptorCount = 0;
-	ResourceDimension mResourceDimension;
 };
 
 class RtvDescriptor : public Descriptor
 {
 public:
-	RtvDescriptor(ResourceDimension resourceDimension);
+	RtvDescriptor() = default;
 	
 	virtual void CreateDescriptorHeap(ID3D12Device* device, UINT descriptorCount) override;
 
-	virtual void CreateDescriptor(ID3D12Device* device, UINT descriptorSize, DXGI_FORMAT viewFormat,
-		ID3D12Resource* resource, ID3D12Resource* counterResource, UINT byteSize) override;
+	void CreateRenderTargetView(ID3D12Device* device, UINT descriptorSize, ID3D12Resource* resource);
 };
 
 class DsvDescriptor : public Descriptor
 {
 public:
-	DsvDescriptor(ResourceDimension resourceDimension);
+	DsvDescriptor() = default;
 
 	virtual void CreateDescriptorHeap(ID3D12Device* device, UINT descriptorCount) override;
 
-	virtual void CreateDescriptor(ID3D12Device* device, UINT descriptorSize, DXGI_FORMAT viewFormat,
-		ID3D12Resource* resource, ID3D12Resource* counterResource, UINT byteSize) override;
+	void CreateDepthStencilView(ID3D12Device* device, UINT descriptorSize, DXGI_FORMAT viewFormat,
+		D3D12_DSV_DIMENSION viewDimension, ID3D12Resource* resource);
 };
 
-class CbvDescriptor : public Descriptor
+class CbvSrvUavDescriptor : public Descriptor
 {
 public:
-	CbvDescriptor(ResourceDimension resourceDimension);
+	CbvSrvUavDescriptor() = default;
 
 	virtual void CreateDescriptorHeap(ID3D12Device* device, UINT descriptorCount) override;
 
-	virtual void CreateDescriptor(ID3D12Device* device, UINT descriptorSize, DXGI_FORMAT viewFormat,
-		ID3D12Resource* resource, ID3D12Resource* counterResource, UINT byteSize) override;
-};
+	void CreateConstantBufferView(ID3D12Device* device, UINT descriptorSize,
+		ID3D12Resource* resource, UINT byteSize);
+	void CreateShaderResourceView(ID3D12Device* device, UINT descriptorSize, DXGI_FORMAT viewFormat,
+		D3D12_SRV_DIMENSION viewDimension, ID3D12Resource* resource);
+	void CreateUnorderedAccessView(ID3D12Device* device, UINT descriptorSize, DXGI_FORMAT viewFormat,
+		D3D12_UAV_DIMENSION viewDimension, ID3D12Resource* resource, ID3D12Resource* counterResource);
 
-class SrvDescriptor : public Descriptor
-{
-public:
-	SrvDescriptor(ResourceDimension resourceDimension);
-
-	virtual void CreateDescriptorHeap(ID3D12Device* device, UINT descriptorCount) override;
-
-	virtual void CreateDescriptor(ID3D12Device* device, UINT descriptorSize, DXGI_FORMAT viewFormat,
-		ID3D12Resource* resource, ID3D12Resource* counterResource, UINT byteSize) override;
-};
-
-class UavDescriptor : public Descriptor
-{
-public:
-	UavDescriptor(ResourceDimension resourceDimension);
-
-	virtual void CreateDescriptorHeap(ID3D12Device* device, UINT descriptorCount) override;
-
-	virtual void CreateDescriptor(ID3D12Device* device, UINT descriptorSize, DXGI_FORMAT viewFormat,
-		ID3D12Resource* resource, ID3D12Resource* counterResource, UINT byteSize) override;
+private:
+	UINT mCbvCount = 0;
+	UINT mSrvCount = 0;
+	UINT mUavCount = 0;
 };

@@ -1,10 +1,23 @@
 cbuffer cbPerObject : register(b0)
 {
     float4x4 gWorld;
+};
+
+cbuffer cbPerScene : register(b1)
+{
     float4x4 gView;
     float4x4 gProj;
-    float4x4 gWorldViewProj;
 };
+
+Texture2D gDiffuseTexture : register(t0);
+
+SamplerState gsamPointWrap : register(s0);
+SamplerState gsamPointClamp : register(s1);
+SamplerState gsamLinearWrap : register(s2);
+SamplerState gsamLinearClamp : register(s3);
+SamplerState gsamAnisotropicWrap : register(s4);
+SamplerState gsamAnisotropicClamp : register(s5);
+SamplerComparisonState gsamShadow : register(s6);
 
 struct VertexIn
 {
@@ -24,8 +37,8 @@ VertexOut VSMain(VertexIn vin)
 {
     VertexOut vout;
     
-    // float4x4 gViewProj = mul(gView, gProj);
-    // float4x4 gWorldViewProj = mul(gWorld, gViewProj); 
+    float4x4 gViewProj = mul(gView, gProj);
+    float4x4 gWorldViewProj = mul(gWorld, gViewProj); 
     
     vout.PosH = mul(float4(vin.PosL, 1.0), gWorldViewProj);
     vout.NormalW = mul(vin.NormalL, (float3x3) gWorld);
@@ -36,5 +49,7 @@ VertexOut VSMain(VertexIn vin)
 
 float4 PSMain(VertexOut pin) : SV_Target
 {
-    return float4(1.0, 0.0, 0.0, 1.0);
+    float4 diffuseAlbedo = gDiffuseTexture.Sample(gsamAnisotropicWrap, pin.TexC);
+    
+    return diffuseAlbedo;
 }

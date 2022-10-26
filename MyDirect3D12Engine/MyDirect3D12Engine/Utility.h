@@ -1,25 +1,5 @@
 #pragma once
-#include <Windows.h>
-#include <Windowsx.h>
-#include <d3dx12.h>
-#include <comdef.h>
-#include <d3d12.h>
-#include <d3dcompiler.h>
-#include <DirectXCollision.h>
-#include <DirectXColors.h>
-#include <DirectXMath.h>
-#include <DirectXPackedVector.h>
-#include <dxgi1_4.h>
-#include <wrl.h>
-#include <array>
-#include <cassert>
-#include <cstdio>
-#include <memory>
-#include <stdexcept>
-#include <string>
-#include <unordered_map>
-#include <vector>
-#include "pix3.h"
+#include "Stdafx.h"
 
 /* inline std::string HrToString(HRESULT hr)
 {
@@ -78,28 +58,6 @@ public:
 #ifndef ReleaseCom
 #define ReleaseCom(x) { if(x){ x->Release(); x = 0; } }
 #endif
-
-enum class ResourceDimension
-{
-	buffer = 0,
-	texture1D,
-	texture1DArray,
-	texture2D,
-	texture2DArray,
-	texture3D,
-	texture3DArray,
-	textureCube,
-	textureCubeArray
-};
-
-enum class DescriptorType : int
-{
-	rtv = 0,
-	dsv,
-	cbv,
-	srv,
-	uav
-};
 
 struct Vertex
 {

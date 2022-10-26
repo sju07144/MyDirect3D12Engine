@@ -1,4 +1,5 @@
 #pragma once
+#include "Stdafx.h"
 #include "Utility.h"
 
 template<typename T>
