@@ -97,11 +97,13 @@ void CbvSrvUavDescriptor::CreateDescriptorHeap(ID3D12Device* device, UINT descri
 	mGpuDescriptorHandle = CD3DX12_GPU_DESCRIPTOR_HANDLE(mDescriptorHeap->GetGPUDescriptorHandleForHeapStart());
 }
 
-void CbvSrvUavDescriptor::CreateConstantBufferView(ID3D12Device* device, UINT descriptorSize, 
+void CbvSrvUavDescriptor::CreateConstantBufferView(ID3D12Device* device, UINT descriptorSize, UINT elementIndex,
 	ID3D12Resource* resource, UINT byteSize)
 {
+	auto cbAddress = resource->GetGPUVirtualAddress() + elementIndex * byteSize;
+
 	D3D12_CONSTANT_BUFFER_VIEW_DESC cbvDesc;
-	cbvDesc.BufferLocation = resource->GetGPUVirtualAddress(); // need to revise
+	cbvDesc.BufferLocation = static_cast<D3D12_GPU_VIRTUAL_ADDRESS>(cbAddress); // need to revise
 	cbvDesc.SizeInBytes = byteSize;
 
 	device->CreateConstantBufferView(&cbvDesc, mCpuDescriptorHandle);

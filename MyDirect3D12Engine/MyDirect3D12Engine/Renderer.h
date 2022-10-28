@@ -30,11 +30,32 @@ struct EnumHash
 	}
 };
 
+struct Light
+{
+	DirectX::XMFLOAT3 strength;
+	float falloffStart; // point/spot light only
+	DirectX::XMFLOAT3 direction; // directional/spot light only
+	float falloffEnd; // point/spot light only
+	DirectX::XMFLOAT3 position; // point light only
+	float spotPower; // spot light only
+
+	static constexpr int maxNumLights = 16;
+};
+
+struct Material
+{
+	std::string name;
+	DirectX::XMFLOAT4 diffuseAlbedo;
+	DirectX::XMFLOAT3 fresnelR0;
+	float roughness;
+};
+
 struct RenderItem
 {
 	Mesh* mesh = nullptr;
 	DirectX::XMFLOAT4X4 world;
 	UINT objectCBIndex = -1;
+	UINT materialCBIndex = -1;
 	UINT diffuseMapIndex = -1;
 };
 
@@ -47,6 +68,19 @@ struct SceneConstant
 {
 	DirectX::XMFLOAT4X4 view;
 	DirectX::XMFLOAT4X4 proj;
+
+	DirectX::XMFLOAT3 cameraPosition;
+	float pad0;
+
+	DirectX::XMFLOAT4 ambientLight;
+	std::array<Light, Light::maxNumLights> lights;
+};
+
+struct MaterialConstant
+{
+	DirectX::XMFLOAT4 diffuseAlbedo;
+	DirectX::XMFLOAT3 fresnelR0;
+	float roughness;
 };
 
 LRESULT CALLBACK WindowProcedure(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
@@ -84,6 +118,7 @@ private:
 
 	void UpdateObjectConstants();
 	void UpdateSceneConstants();
+	void UpdateMaterialConstants();
 
 	void EnableDebugLayer();
 	void CheckMultiSamplingSupport(ID3D12Device* device, DXGI_FORMAT backBufferFormat);
@@ -95,6 +130,7 @@ private:
 		const std::string& rootSignatureName, const std::string& shaderName);
 
 	void LoadTextures();
+	void BuildMaterials();
 
 	void BuildRenderItems();
 	void DrawRenderItems(ID3D12GraphicsCommandList* commandList);
@@ -110,7 +146,7 @@ private:
 	static Renderer* renderer;
 
 	std::unique_ptr<BasicDirect3DComponent> mDirect3D;
-	std::unique_ptr<Command> mCommand;
+	std::unique_ptr<Command> mCommandObject;
 	std::unique_ptr<SwapChain> mSwapChain;
 	std::unique_ptr<DepthStencil> mDepthStencil;
 
@@ -131,9 +167,11 @@ private:
 
 	std::unordered_map<std::string, std::unique_ptr<Mesh>> mMeshes;
 	std::unordered_map<std::string, std::unique_ptr<Texture>> mTextures;
+	std::unordered_map<std::string, std::unique_ptr<Material>> mMaterials;
 
 	std::unique_ptr<UploadBuffer<ObjectConstant>> mObjectCBs = nullptr;
 	std::unique_ptr<UploadBuffer<SceneConstant>> mSceneCBs = nullptr;
+	std::unique_ptr<UploadBuffer<MaterialConstant>> mMaterialCBs = nullptr;
 
 	std::vector<RenderItem> mRenderItems;
 

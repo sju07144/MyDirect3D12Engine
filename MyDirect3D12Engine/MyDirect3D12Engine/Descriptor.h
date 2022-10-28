@@ -52,7 +52,7 @@ public:
 
 	virtual void CreateDescriptorHeap(ID3D12Device* device, UINT descriptorCount) override;
 
-	void CreateConstantBufferView(ID3D12Device* device, UINT descriptorSize,
+	void CreateConstantBufferView(ID3D12Device* device, UINT descriptorSize, UINT elementIndex,
 		ID3D12Resource* resource, UINT byteSize);
 	void CreateShaderResourceView(ID3D12Device* device, UINT descriptorSize, DXGI_FORMAT viewFormat,
 		D3D12_SRV_DIMENSION viewDimension, ID3D12Resource* resource);

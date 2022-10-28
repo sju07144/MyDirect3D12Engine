@@ -10,6 +10,7 @@ public:
 	BasicGeometryGenerator() = default;
 
 	Mesh CreateBox(float width, float height, float depth);
+	Mesh CreateGrid(float width, float depth, uint32_t m, uint32_t n);
 private:
 	std::vector<Vertex> mVertices;
 	UINT mVertexCount;

@@ -14,7 +14,7 @@ Renderer::Renderer(HINSTANCE hInstance)
 	: mWindowWidth(800), mWindowHeight(600),
 	mViewportWidth(800), mViewportHeight(600),
 	mDirect3D(std::make_unique<BasicDirect3DComponent>()),
-	mCommand(std::make_unique<Command>()),
+	mCommandObject(std::make_unique<Command>()),
 	mSwapChain(std::make_unique<SwapChain>()),
 	mDepthStencil(std::make_unique<DepthStencil>()),
 	mCamera(std::make_unique<Camera>()),
@@ -38,7 +38,7 @@ Renderer::Renderer(HINSTANCE hInstance)
 Renderer::~Renderer()
 {
 	if (mDirect3D->GetDevice() != nullptr)
-		mDirect3D->WaitForPreviousFrame(mCommand->GetCommandQueue());
+		mDirect3D->WaitForPreviousFrame(mCommandObject->GetCommandQueue());
 
 	renderer = nullptr;
 }
@@ -68,16 +68,16 @@ void Renderer::Initialize()
 	CheckMultiSamplingSupport(device, backBufferFormat);
 
 	// Create command objects
-	mCommand->CreateCommandAllocator(device);
-	mCommand->CreateCommandQueue(device);
-	mCommand->CreateGraphicsCommandList(device);
+	mCommandObject->CreateCommandAllocator(device);
+	mCommandObject->CreateCommandQueue(device);
+	mCommandObject->CreateGraphicsCommandList(device);
 
-	auto commandList = mCommand->GetCommandList();
-	auto commandQueue = mCommand->GetCommandQueue();
+	auto commandList = mCommandObject->GetCommandList();
+	auto commandQueue = mCommandObject->GetCommandQueue();
 
 	// Create swap chain and back buffer
 	mSwapChain->CreateSwapChain(mDirect3D->GetFactory(),
-		mCommand->GetCommandQueue(), mhWnd,
+		mCommandObject->GetCommandQueue(), mhWnd,
 		mViewportWidth, mViewportHeight);
 
 	// Create depth stencil buffer
@@ -98,19 +98,27 @@ void Renderer::Initialize()
 
 	// Create box
 	BasicGeometryGenerator geoGenerator;
-	std::unique_ptr<Mesh> box = std::make_unique<Mesh>(geoGenerator.CreateBox(2.0f, 2.0f, 2.0f));
+	auto box = std::make_unique<Mesh>(geoGenerator.CreateBox(2.0f, 2.0f, 2.0f));
 	box->ConfigureMesh(device, commandList);
 	mMeshes.insert({ "box", std::move(box) });
 
+	auto grid = std::make_unique<Mesh>(geoGenerator.CreateGrid(10.0f, 20.0f, 10, 20));
+	grid->ConfigureMesh(device, commandList);
+	mMeshes.insert({ "grid", std::move(grid) });
+
 	// Initialize constant buffer
-	mObjectCBs = std::make_unique<UploadBuffer<ObjectConstant>>(device, 2, true);
+	mObjectCBs = std::make_unique<UploadBuffer<ObjectConstant>>(device, 3, true);
 	mSceneCBs = std::make_unique<UploadBuffer<SceneConstant>>(device, 1, true);
+	mMaterialCBs = std::make_unique<UploadBuffer<MaterialConstant>>(device, 3, true);
 
 	// Create descriptor heap
-	mCbvSrvUavDescriptor->CreateDescriptorHeap(device, 2);
+	mCbvSrvUavDescriptor->CreateDescriptorHeap(device, 3);
 
 	// Load Textures
 	LoadTextures();
+
+	// Build materials
+	BuildMaterials();
 
 	// Create descriptor heap and shader resource view
 	auto woodTexture = mTextures["wood"]->GetTextureResource();
@@ -119,6 +127,9 @@ void Renderer::Initialize()
 	auto trinketTexture = mTextures["trinket"]->GetTextureResource();
 	mCbvSrvUavDescriptor->CreateShaderResourceView(device, mDirect3D->GetCbvSrvUavDescriptorSize(),
 		trinketTexture->GetDesc().Format, D3D12_SRV_DIMENSION_TEXTURE2D, trinketTexture);
+	auto aquaTexture = mTextures["aqua"]->GetTextureResource();
+	mCbvSrvUavDescriptor->CreateShaderResourceView(device, mDirect3D->GetCbvSrvUavDescriptorSize(),
+		aquaTexture->GetDesc().Format, D3D12_SRV_DIMENSION_TEXTURE2D, aquaTexture);
 
 	// Create vertex and pixel shader
 	std::unique_ptr<Shader> vertexShader = std::make_unique<Shader>();
@@ -354,9 +365,9 @@ bool Renderer::InitializeWindow()
 void Renderer::Resize()
 {
 	auto device = mDirect3D->GetDevice();
-	auto commandAllocator = mCommand->GetCommandAllocator();
-	auto commandList = mCommand->GetCommandList();
-	auto commandQueue = mCommand->GetCommandQueue();
+	auto commandAllocator = mCommandObject->GetCommandAllocator();
+	auto commandList = mCommandObject->GetCommandList();
+	auto commandQueue = mCommandObject->GetCommandQueue();
 
 	mDirect3D->WaitForPreviousFrame(commandQueue);
 
@@ -433,13 +444,14 @@ void Renderer::UpdateData()
 {
 	UpdateObjectConstants();
 	UpdateSceneConstants();
+	UpdateMaterialConstants();
 }
 void Renderer::DrawScene()
 {
 	auto device = mDirect3D->GetDevice();
-	auto commandAllocator = mCommand->GetCommandAllocator();
-	auto commandList = mCommand->GetCommandList();
-	auto commandQueue = mCommand->GetCommandQueue();
+	auto commandAllocator = mCommandObject->GetCommandAllocator();
+	auto commandList = mCommandObject->GetCommandList();
+	auto commandQueue = mCommandObject->GetCommandQueue();
 
 	auto currentBackBuffer = mSwapChain->GetCurrentBackBuffer();
 
@@ -456,7 +468,7 @@ void Renderer::DrawScene()
 	D3D12_CPU_DESCRIPTOR_HANDLE currentRenderTargetView =
 		CD3DX12_CPU_DESCRIPTOR_HANDLE(mRtvDescriptor->GetStartCPUDescriptorHandle(), 
 		mSwapChain->GetCurrentBackBufferIndex(), mDirect3D->GetRtvDescriptorSize());
-	commandList->ClearRenderTargetView(currentRenderTargetView, Colors::LightSteelBlue, 0, nullptr);
+	commandList->ClearRenderTargetView(currentRenderTargetView, Colors::Black, 0, nullptr);
 	commandList->ClearDepthStencilView(mDsvDescriptor->GetStartCPUDescriptorHandle(), 
 		D3D12_CLEAR_FLAG_DEPTH | D3D12_CLEAR_FLAG_STENCIL, 1.0f, 0, 0, nullptr);
 
@@ -510,7 +522,30 @@ void Renderer::UpdateSceneConstants()
 	XMStoreFloat4x4(&sceneConstant.view, XMMatrixTranspose(v));
 	XMStoreFloat4x4(&sceneConstant.proj, XMMatrixTranspose(p));
 
+	sceneConstant.cameraPosition = mCamera->GetPosition();
+
+	sceneConstant.ambientLight = XMFLOAT4{ 0.25f, 0.15f, 0.35f, 1.0f };
+	sceneConstant.lights[0].direction = XMFLOAT3{ 0.0f, -1.0f, -1.0f };
+	sceneConstant.lights[0].strength = XMFLOAT3{ 1.0f, 0.8f, 0.9f };
+
 	mSceneCBs->CopyData(0, sceneConstant);
+}
+void Renderer::UpdateMaterialConstants()
+{
+	MaterialConstant materialConstant;
+	UINT elementIndex = 0;
+
+	for (const auto& material : mMaterials)
+	{
+		auto m = material.second.get();
+
+		materialConstant.diffuseAlbedo = m->diffuseAlbedo;
+		materialConstant.fresnelR0 = m->fresnelR0;
+		materialConstant.roughness = m->roughness;
+
+		mMaterialCBs->CopyData(elementIndex, materialConstant);
+		elementIndex++;
+	}
 }
 
 void Renderer::EnableDebugLayer()
@@ -567,15 +602,16 @@ void Renderer::CreateRootSignature(ID3D12Device* device, const std::string& root
 	CD3DX12_DESCRIPTOR_RANGE texTable;
 	texTable.Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 0);
 
-	CD3DX12_ROOT_PARAMETER slotRootParameters[3];
+	CD3DX12_ROOT_PARAMETER slotRootParameters[4];
 	// slotRootParameters[0].InitAsDescriptorTable(1, &cbvTable);
 	slotRootParameters[0].InitAsConstantBufferView(0);
 	slotRootParameters[1].InitAsConstantBufferView(1);
-	slotRootParameters[2].InitAsDescriptorTable(1, &texTable, D3D12_SHADER_VISIBILITY_PIXEL);
+	slotRootParameters[2].InitAsConstantBufferView(2);
+	slotRootParameters[3].InitAsDescriptorTable(1, &texTable, D3D12_SHADER_VISIBILITY_PIXEL);
 
 	auto samplers = Texture::GetStaticSamplers();
 
-	CD3DX12_ROOT_SIGNATURE_DESC rootSignatureDesc(3, slotRootParameters,
+	CD3DX12_ROOT_SIGNATURE_DESC rootSignatureDesc(4, slotRootParameters,
 		(UINT)samplers.size(), samplers.data(), 
 		D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT);
 
@@ -626,21 +662,48 @@ void Renderer::LoadTextures()
 {
 	// cache the d3d12 object
 	auto device = mDirect3D->GetDevice();
-	auto commandList = mCommand->GetCommandList();
+	auto commandList = mCommandObject->GetCommandList();
 
 	auto woodTexture = std::make_unique<Texture>();
 	std::string texName = "wood";
-
 	woodTexture->CreateTexture(device, commandList, texName.c_str(), L"./Textures/wood.dds");
-
 	mTextures.insert({ texName, std::move(woodTexture) });
 
 	auto trinketTexture = std::make_unique<Texture>();
 	texName = "trinket";
-
 	trinketTexture->CreateTexture(device, commandList, texName.c_str(), L"./Textures/trinket.dds");
-
 	mTextures.insert({ texName, std::move(trinketTexture) });
+
+	auto aquaTexture = std::make_unique<Texture>();
+	texName = "aqua";
+	aquaTexture->CreateTexture(device, commandList, texName.c_str(), L"./Textures/aqua.dds");
+	mTextures.insert({ texName, std::move(aquaTexture) });
+}
+void Renderer::BuildMaterials()
+{
+	auto woodBox = std::make_unique<Material>();
+	woodBox->name = "woodBox";
+	woodBox->diffuseAlbedo = XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f);
+	woodBox->fresnelR0 = XMFLOAT3(0.1f, 0.1f, 0.1f);
+	woodBox->roughness = 0.01f;
+
+	mMaterials.insert({ woodBox->name, std::move(woodBox) });
+
+	auto trinketBox = std::make_unique<Material>();
+	trinketBox->name = "trinketBox";
+	trinketBox->diffuseAlbedo = XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f);
+	trinketBox->fresnelR0 = XMFLOAT3(0.01f, 0.01f, 0.01f);
+	trinketBox->roughness = 0.5f;
+
+	mMaterials.insert({ trinketBox->name, std::move(trinketBox) });
+
+	auto aquaGrid = std::make_unique<Material>();
+	aquaGrid->name = "aquaGrid";
+	aquaGrid->diffuseAlbedo = XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f);
+	aquaGrid->fresnelR0 = XMFLOAT3(0.05f, 0.05f, 0.05f);
+	aquaGrid->roughness = 0.1f;
+
+	mMaterials.insert({ aquaGrid->name, std::move(aquaGrid) });
 }
 
 void Renderer::BuildRenderItems()
@@ -656,6 +719,7 @@ void Renderer::BuildRenderItems()
 	XMStoreFloat4x4(&renderItem.world, world);
 	renderItem.objectCBIndex = 0;
 	renderItem.diffuseMapIndex = 0;
+	renderItem.materialCBIndex = 0;
 	mRenderItems.push_back(renderItem);
 
 	renderItem.mesh = mMeshes["box"].get();
@@ -667,11 +731,25 @@ void Renderer::BuildRenderItems()
 	XMStoreFloat4x4(&renderItem.world, world);
 	renderItem.objectCBIndex = 1;
 	renderItem.diffuseMapIndex = 1;
+	renderItem.materialCBIndex = 1;
+	mRenderItems.push_back(renderItem);
+
+	renderItem.mesh = mMeshes["grid"].get();
+	world = XMMatrixSet(
+		1.0f, 0.0f, 0.0f, 0.0f,
+		0.0f, 1.0f, 0.0f, 0.0f,
+		0.0f, 0.0f, 1.0f, 0.0f,
+		0.0f, -7.0f, 0.0f, 1.0f);
+	XMStoreFloat4x4(&renderItem.world, world);
+	renderItem.objectCBIndex = 2;
+	renderItem.diffuseMapIndex = 2;
+	renderItem.materialCBIndex = 2;
 	mRenderItems.push_back(renderItem);
 }
 void Renderer::DrawRenderItems(ID3D12GraphicsCommandList* commandList)
 {
 	UINT objectCBbyteSize = D3D12Utility::CalculateConstantBufferSize(sizeof(ObjectConstant));
+	UINT materialCBbyteSize = D3D12Utility::CalculateConstantBufferSize(sizeof(MaterialConstant));
 	UINT cbvSrvUavDescriptorSize = mDirect3D->GetCbvSrvUavDescriptorSize();
 
 	for (const auto& renderItem : mRenderItems)
@@ -686,9 +764,13 @@ void Renderer::DrawRenderItems(ID3D12GraphicsCommandList* commandList)
 		objectCBAddress += renderItem.objectCBIndex * objectCBbyteSize;
 		commandList->SetGraphicsRootConstantBufferView(0, objectCBAddress);
 
+		auto materialCBAddress = mMaterialCBs->GetUploadBuffer()->GetGPUVirtualAddress();
+		materialCBAddress += renderItem.materialCBIndex * materialCBbyteSize;
+		commandList->SetGraphicsRootConstantBufferView(2, materialCBAddress);
+
 		CD3DX12_GPU_DESCRIPTOR_HANDLE cbvSrvUavDescriptor(mCbvSrvUavDescriptor->GetStartGPUDescriptorHandle());
 		cbvSrvUavDescriptor.Offset(renderItem.diffuseMapIndex, mDirect3D->GetCbvSrvUavDescriptorSize());
-		commandList->SetGraphicsRootDescriptorTable(2, cbvSrvUavDescriptor);
+		commandList->SetGraphicsRootDescriptorTable(3, cbvSrvUavDescriptor);
 
 		commandList->DrawIndexedInstanced((renderItem.mesh)->GetIndexCount(), 1, 0, 0, 0);
 	}
