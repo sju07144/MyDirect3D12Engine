@@ -1,4 +1,4 @@
-#include "../Includes/DepthStencil.h"
+#include "../includes/DepthStencil.h"
 
 void DepthStencil::CreateDepthStencilBuffer(ID3D12Device* device,
 	UINT width, UINT height,

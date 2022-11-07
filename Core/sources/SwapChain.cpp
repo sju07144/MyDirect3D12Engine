@@ -1,4 +1,4 @@
-#include "../Includes/SwapChain.h"
+#include "../includes/SwapChain.h"
 
 SwapChain::SwapChain()
 {

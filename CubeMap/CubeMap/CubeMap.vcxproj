@@ -37,7 +37,6 @@
     <ClInclude Include="Renderer.h" />
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="..\..\Core\includes\Model.cpp" />
     <ClCompile Include="..\..\Core\sources\BasicGeometryGenerator.cpp" />
     <ClCompile Include="..\..\Core\sources\Camera.cpp" />
     <ClCompile Include="..\..\Core\sources\Command.cpp" />
@@ -45,6 +44,7 @@
     <ClCompile Include="..\..\Core\sources\Descriptor.cpp" />
     <ClCompile Include="..\..\Core\sources\Direct3d.cpp" />
     <ClCompile Include="..\..\Core\sources\Mesh.cpp" />
+    <ClCompile Include="..\..\Core\sources\Model.cpp" />
     <ClCompile Include="..\..\Core\sources\Shader.cpp" />
     <ClCompile Include="..\..\Core\sources\SwapChain.cpp" />
     <ClCompile Include="..\..\Core\sources\Texture.cpp" />

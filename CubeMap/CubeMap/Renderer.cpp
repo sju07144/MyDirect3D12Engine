@@ -868,11 +868,13 @@ void Renderer::BuildRenderItems()
 	renderItem.materialCBIndex = 2;
 	mOpaqueRenderItems.push_back(renderItem);
 
+	XMMATRIX scalingMatrix = XMMatrixScaling(10.0f, 10.0f, 10.0f);
+	XMMATRIX rotationMatrix = XMMatrixRotationZ(XM_PIDIV2);
 	for (UINT i = 0; i < 5; i++)
 	{
 		std::string meshName = "MinatoAqua" + std::to_string(i);
 		renderItem.mesh = mMeshes[meshName].get();
-		world = XMMatrixScaling(10.0f, 10.0f, 10.0f);
+		world = XMMatrixMultiply(scalingMatrix, rotationMatrix);
 		XMStoreFloat4x4(&renderItem.world, world);
 		renderItem.objectCBIndex = i + 3;
 		renderItem.diffuseMapIndex = i + 3;

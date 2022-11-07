@@ -1,4 +1,4 @@
-#include "../Includes/Texture.h"
+#include "../includes/Texture.h"
 using namespace DirectX;
 
 void Texture::SetTextureFilename(const std::string& path)

@@ -1,4 +1,4 @@
-#include "../Includes/Direct3d.h"
+#include "../includes/Direct3d.h"
 
 using namespace Microsoft::WRL;
 

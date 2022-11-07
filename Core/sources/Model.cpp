@@ -28,13 +28,13 @@ std::vector<Texture> Model::GetRawTextures()
 
 void Model::ProcessNode(aiNode* node, const aiScene* scene)
 {
-	for (int i = 0; i < node->mNumMeshes; i++)
+	for (UINT i = 0; i < node->mNumMeshes; i++)
 	{
 		auto meshIndex = node->mMeshes[i];
 		mMeshes.push_back(ProcessMesh(scene->mMeshes[meshIndex], scene));
 	}
 
-	for (int i = 0; i < node->mNumChildren; i++)
+	for (UINT i = 0; i < node->mNumChildren; i++)
 		ProcessNode(node->mChildren[i], scene);
 }
 Mesh Model::ProcessMesh(aiMesh* mesh, const aiScene* scene)
@@ -45,7 +45,7 @@ Mesh Model::ProcessMesh(aiMesh* mesh, const aiScene* scene)
 	vertices.reserve(mesh->mNumVertices);
 	indices.reserve(mesh->mNumVertices);
 	
-	for (int i = 0; i < mesh->mNumVertices; i++)
+	for (UINT i = 0; i < mesh->mNumVertices; i++)
 	{
 		Vertex vertex;
 
@@ -68,7 +68,7 @@ Mesh Model::ProcessMesh(aiMesh* mesh, const aiScene* scene)
 		vertices.push_back(vertex);
 	}
 
-	for (int i = 0; i < mesh->mNumFaces; i++)
+	for (UINT i = 0; i < mesh->mNumFaces; i++)
 	{
 		aiFace face = mesh->mFaces[i];
 		for (unsigned int j = 0; j < face.mNumIndices; j++)
@@ -88,9 +88,9 @@ Mesh Model::ProcessMesh(aiMesh* mesh, const aiScene* scene)
 void Model::LoadTexture(aiMaterial* mat, aiTextureType textureType)
 {
 	
-	unsigned int textureCount = mat->GetTextureCount(textureType);
+	UINT textureCount = mat->GetTextureCount(textureType);
 
-	for (int i = 0; i < textureCount; i++)
+	for (UINT i = 0; i < textureCount; i++)
 	{
 		Texture texture;
 		aiString path;

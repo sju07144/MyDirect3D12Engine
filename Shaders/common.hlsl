@@ -15,6 +15,7 @@
 cbuffer cbPerObject : register(b0)
 {
     float4x4 gWorld;
+    uint materialIndex;
 };
 
 cbuffer cbScene : register(b1)
@@ -35,6 +36,21 @@ cbuffer cbMaterial : register(b2)
     float gRoughness;
 };
 
+struct MaterialData
+{
+    float4 diffuseAlbedo;
+    float3 fresnelR0;
+    float roughness;
+};
+
+struct InstanceData
+{
+    float4x4 world;
+    uint materialIndex;
+};
+
+StructuredBuffer<MaterialData> gMaterialDatas : register(t0, space1);
+StructuredBuffer<InstanceData> gInstanceDatas : register(t1, space1);
 Texture2D gDiffuseTexture : register(t0);
 TextureCube gSkyBox : register(t1);
 

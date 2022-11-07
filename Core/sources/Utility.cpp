@@ -1,4 +1,4 @@
-#include "../Includes/Utility.h"
+#include "../includes/Utility.h"
 
 const float MathUtility::PI = 3.14159265359f;
 

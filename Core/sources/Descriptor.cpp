@@ -1,4 +1,4 @@
-#include "../Includes/Descriptor.h"
+#include "../includes/Descriptor.h"
 
 ID3D12DescriptorHeap* Descriptor::GetDescriptorHeap()
 {

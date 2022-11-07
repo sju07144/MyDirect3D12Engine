@@ -1,4 +1,4 @@
-#include "../Includes/Timer.h"
+#include "../includes/Timer.h"
 
 Timer::Timer()
 	: mSecondsPerCount(0.0), mDeltaTime(-1.0),

@@ -1,4 +1,4 @@
-#include "../Includes/Shader.h"
+#include "../includes/Shader.h"
 using namespace Microsoft::WRL;
 
 void Shader::CompileShader(
