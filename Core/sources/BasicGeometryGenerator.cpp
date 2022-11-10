@@ -259,3 +259,92 @@ Mesh BasicGeometryGenerator::CreateSphere(float radius, uint32_t sliceCount, uin
 
 	return Mesh(mVertices, mIndices);
 }
+
+Mesh BasicGeometryGenerator::CreateTerrain(const unsigned char* heightValues, 
+	int width, int height, int nChannels)
+{
+	std::vector<Vertex> vertices;
+	std::vector<uint32_t> indices;
+
+	// vertex generation
+	float yScale = 64.0f / 256.0f, yShift = 16.0f; // apply a scale + shift to the height data
+	for (int i = 0; i < height; i++)
+	{
+		for (int j = 0; j < width; j++)
+		{
+			// retrieve texel for (i, j) tex coord
+			const unsigned char* texel = heightValues + (j + width * i) * nChannels;
+			unsigned char y = texel[0];
+
+			// vertex
+			Vertex vertex;
+
+			vertex.position.x = (-height / 2.0f + i);
+			vertex.position.y = static_cast<float>(y) * yScale - yShift;
+			vertex.position.z = (-width / 2.0f + j);
+
+			vertex.normal = XMFLOAT3(0.0f, 1.0f, 0.0f);
+			vertex.texCoord = XMFLOAT2(0.0f, 0.0f);
+
+			vertices.push_back(vertex);
+		}
+	}
+
+	// index generation
+	for (int i = 0; i < height - 1; i++) // for each row a.k.a. each strip
+	{
+		for (int j = 0; j < width; j++) // for each column
+		{
+			for (int k = 0; k < 2; k++) // for each side of the strip
+			{
+				indices.push_back(static_cast<UINT>(j + width * (i + k)));
+			}
+		}
+	}
+
+	return Mesh(vertices, indices);
+}
+
+Mesh BasicGeometryGenerator::CreateTerrainPatches(int width, int height, UINT countOfPatches)
+{
+	std::vector<Vertex> vertices;
+	std::vector<uint32_t> indices;
+
+	vertices.reserve((countOfPatches + 1) * (countOfPatches + 1));
+	indices.reserve(countOfPatches * countOfPatches);
+
+	// vertex generation
+	for (UINT i = 0; i <= countOfPatches; i++)
+	{
+		for (UINT j = 0; j <= countOfPatches; j++)
+		{
+			// vertex
+			Vertex vertex;
+
+			vertex.position.x = (-width / 2.0f + width * i / static_cast<float>(countOfPatches));
+			vertex.position.y = 0.0f;
+			vertex.position.z = (-height / 2.0f + height * j / static_cast<float>(countOfPatches));
+
+			vertex.normal = XMFLOAT3(0.0f, 1.0f, 0.0f);
+
+			vertex.texCoord.x = (i / static_cast<float>(countOfPatches));
+			vertex.texCoord.y = (j / static_cast<float>(countOfPatches));
+
+			vertices.push_back(vertex);
+		}
+	}
+
+	// index generation
+	for (int i = 0; i <= countOfPatches - 1; i++) // for each row a.k.a. each strip
+	{
+		for (int j = 0; j <= countOfPatches - 1; j++) // for each column
+		{
+			indices.push_back(static_cast<UINT>(j + i * (countOfPatches + 1)));
+			indices.push_back(static_cast<UINT>(j + (i + 1) * (countOfPatches + 1)));
+			indices.push_back(static_cast<UINT>(j + 1 + i * (countOfPatches + 1)));
+			indices.push_back(static_cast<UINT>(j + 1 + (i + 1) * (countOfPatches + 1)));
+		}
+	}
+
+	return Mesh(vertices, indices, D3D_PRIMITIVE_TOPOLOGY_4_CONTROL_POINT_PATCHLIST);
+}

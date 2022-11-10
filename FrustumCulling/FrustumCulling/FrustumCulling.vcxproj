@@ -115,11 +115,14 @@
       <WarningLevel>Level3</WarningLevel>
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>_DEBUG;_WINDOWS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
-      <ConformanceMode>true</ConformanceMode>
+      <ConformanceMode>false</ConformanceMode>
+      <AdditionalIncludeDirectories>F:\MyDirect3D12Engine\includes;F:\MyDirect3D12Engine\ExternalLibraries\DirectXTK12\include;F:\MyDirect3D12Engine\ExternalLibraries\assimp\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
+      <AdditionalDependencies>d3d12.lib;d3dcompiler.lib;dxgi.lib;dxguid.lib;assimp-vc142-mtd.lib;DirectXTex.lib;DirectXTK12.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>F:\MyDirect3D12Engine\ExternalLibraries\assimp\lib\Debug;F:\MyDirect3D12Engine\ExternalLibraries\DirectXTex\x64\Debug;F:\MyDirect3D12Engine\ExternalLibraries\DirectXTK12\lib\x64\Debug;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
@@ -129,13 +132,16 @@
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>NDEBUG;_WINDOWS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
-      <ConformanceMode>true</ConformanceMode>
+      <ConformanceMode>false</ConformanceMode>
+      <AdditionalIncludeDirectories>F:\MyDirect3D12Engine\includes;F:\MyDirect3D12Engine\ExternalLibraries\DirectXTK12\include;F:\MyDirect3D12Engine\ExternalLibraries\assimp\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>true</GenerateDebugInformation>
+      <AdditionalDependencies>d3d12.lib;d3dcompiler.lib;dxgi.lib;dxguid.lib;assimp-vc142-mt.lib;DirectXTex.lib;DirectXTK12.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>F:\MyDirect3D12Engine\ExternalLibraries\assimp\lib\Release;F:\MyDirect3D12Engine\ExternalLibraries\DirectXTex\x64\Release;F:\MyDirect3D12Engine\ExternalLibraries\DirectXTK12\x64\Release;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
@@ -154,6 +160,7 @@
     <ClInclude Include="..\..\Core\includes\Timer.h" />
     <ClInclude Include="..\..\Core\includes\UploadBuffer.h" />
     <ClInclude Include="..\..\Core\includes\Utility.h" />
+    <ClInclude Include="Renderer.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\Core\sources\BasicGeometryGenerator.cpp" />
@@ -169,6 +176,8 @@
     <ClCompile Include="..\..\Core\sources\Texture.cpp" />
     <ClCompile Include="..\..\Core\sources\Timer.cpp" />
     <ClCompile Include="..\..\Core\sources\Utility.cpp" />
+    <ClCompile Include="main.cpp" />
+    <ClCompile Include="Renderer.cpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

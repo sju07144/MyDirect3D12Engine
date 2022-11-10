@@ -11,12 +11,14 @@
 #include <DirectXPackedVector.h>
 #include <dxgi1_4.h>
 #include <wrl.h>
+#include <stb_image.h>
 #include <array>
 #include <cassert>
 #include <codecvt>
 #include <cstdio>
 #include <locale>
 #include <memory>
+#include <random>
 #include <sstream>
 #include <stdexcept>
 #include <string>

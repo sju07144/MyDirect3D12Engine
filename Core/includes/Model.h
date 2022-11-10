@@ -23,6 +23,6 @@ private:
 
 	void LoadTexture(aiMaterial* mat, aiTextureType textureType);
 private:
-	std::vector<Mesh> mMeshes;
-	std::vector<Texture> mRawTextures;
+	std::vector<Mesh> mMeshes; // Meshes that configure model.
+	std::vector<Texture> mRawTextures; // Textures that don't create DirectX resource yet.
 };
