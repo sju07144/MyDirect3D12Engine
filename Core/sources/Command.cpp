@@ -46,3 +46,8 @@ ID3D12GraphicsCommandList* Command::GetCommandList()
 {
 	return mCommandList.Get();
 }
+
+void Command::ResetCommandList()
+{
+	mCommandList->Reset(mCommandAllocator.Get(), nullptr);
+}
