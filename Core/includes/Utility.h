@@ -86,6 +86,8 @@ public:
 		Microsoft::WRL::ComPtr<ID3D12Resource>& uploadBuffer);
 
 	static UINT CalculateConstantBufferSize(UINT size);
+
+	static std::wstring ImageFormatToDDS(const std::wstring& filePath);
 };
 
 class MathUtility

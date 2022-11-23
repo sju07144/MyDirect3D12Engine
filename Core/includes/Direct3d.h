@@ -20,6 +20,9 @@ public:
 	UINT GetRtvDescriptorSize();
 	UINT GetDsvDescriptorSize();
 	UINT GetCbvSrvUavDescriptorSize();
+
+	void PlusOneFenceValue();
+	UINT64 GetFenceValue();
 private:
 	void CreateFactory();
 	void CreateDevice();

@@ -26,8 +26,6 @@ Renderer::Renderer(HINSTANCE hInstance)
 		0.0f, 1.0f, 0.0f);
 
 	mCamera.SetLens(0.25f * XM_PI, aspectRatio, 1.0f, 1000.0f);
-
-	mUtahTeapot.LoadModel("../../Models/teapot/teapot.obj");
 }
 Renderer::~Renderer()
 {
@@ -65,7 +63,7 @@ void Renderer::Initialize()
 	mInitializeCommandObject.CreateCommandAllocator(device);
 	mInitializeCommandObject.CreateGraphicsCommandList(device);
 
-	CreateCommandQueue(device, D3D12_COMMAND_LIST_TYPE_DIRECT);
+	CreateDirectCommandQueue(device);
 
 	auto commandList = mInitializeCommandObject.GetCommandList();
 	auto commandQueue = mDirectCommandQueue.Get();
@@ -106,29 +104,24 @@ void Renderer::Initialize()
 	sphere.ConfigureMesh(device, commandList);
 	mMeshes.insert({ "sphere", std::move(sphere) });
 
-	UINT i = 0;
-	auto teapotMeshes = mUtahTeapot.GetMeshes();
-	for (auto& teapotMesh : teapotMeshes)
-	{
-		teapotMesh.ConfigureMesh(device, commandList);
-		mMeshes.insert({ "teapot" + std::to_string(i), teapotMesh });
-		i++;
-	}
+	auto quad = geoGenerator.CreateQuad(0.0f, 0.0f, 1.0f, 1.0f, 0.0f);
+	quad.ConfigureMesh(device, commandList);
+	mMeshes.insert({ "quad", std::move(quad) });
 
 	// Initialize constant buffer
-		// Build frameresources
+	// Build frameresources
 	for (UINT i = 0; i < mFrameResourceCount; i++)
-		mFrameResources.push_back(std::make_unique<FrameResource>(device, 4, 1, 4, 100));
+		mFrameResources.push_back(std::make_unique<FrameResource>(device, 5, 1, 4, 100));
+
+	// Create cbvsrvuav descriptor heap
+	mCbvSrvUavDescriptor.CreateDescriptorHeap(device, 11);
 
 	// Load Textures
 	LoadTextures();
+	mRenderTexture.CreateDefaultTexture(device, mWindowWidth, mWindowHeight, DXGI_FORMAT_R8G8B8A8_UNORM);
 
 	// Build materials
 	BuildMaterials();
-
-	// Create descriptor heap
-	UINT teapotTextureCount = static_cast<UINT>(mUtahTeapot.GetRawTextures().size());
-	mCbvSrvUavDescriptor.CreateDescriptorHeap(device, 4 + teapotTextureCount);
 
 	// Create descriptor heap and shader resource view
 	auto woodTexture = mTextures["wood"].GetTextureResource();
@@ -145,12 +138,17 @@ void Renderer::Initialize()
 	mCbvSrvUavDescriptor.CreateShaderResourceView(device, mDirect3D.GetCbvSrvUavDescriptorSize(),
 		skyboxTexture->GetDesc().Format, D3D12_SRV_DIMENSION_TEXTURECUBE, skyboxTexture);
 
-	for (UINT i = 0; i < teapotTextureCount; i++)
-	{
-		auto texture = mTextures["teapot" + std::to_string(i)].GetTextureResource();
-		mCbvSrvUavDescriptor.CreateShaderResourceView(device, mDirect3D.GetCbvSrvUavDescriptorSize(),
-			texture->GetDesc().Format, D3D12_SRV_DIMENSION_TEXTURE2D, texture);
-	}
+	auto renderTexture = mRenderTexture.GetTextureResource();
+	mCbvSrvUavDescriptor.CreateShaderResourceView(device, mDirect3D.GetCbvSrvUavDescriptorSize(),
+		DXGI_FORMAT_R8G8B8A8_UNORM, D3D12_SRV_DIMENSION_TEXTURE2D, renderTexture);
+
+	// Initialize blur filter
+	mBlurFilter = std::make_unique<BlurFilter>(device, mWindowWidth, mWindowHeight, DXGI_FORMAT_R8G8B8A8_UNORM);
+	mBlurFilter->BuildDescriptors(device, mCbvSrvUavDescriptor, mDirect3D.GetCbvSrvUavDescriptorSize());
+
+	// Initialize sobel filter
+	mSobelFilter = std::make_unique<SobelFilter>(device, mWindowWidth, mWindowHeight, DXGI_FORMAT_R8G8B8A8_UNORM);
+	mSobelFilter->BuildDescriptors(device, mCbvSrvUavDescriptor, mDirect3D.GetCbvSrvUavDescriptorSize());
 
 	// Create vertex and pixel shader
 	Shader vertexShader;
@@ -174,11 +172,33 @@ void Renderer::Initialize()
 	mShaders.insert({ "skyVS", std::move(skyVertexShader) });
 	mShaders.insert({ "skyPS", std::move(skyPixelShader) });
 
+	Shader horzBlurComputeShader;
+	Shader vertBlurComputeShader;
+	horzBlurComputeShader.CompileShader(L"../../Shaders/blur.hlsl", nullptr, "HorzCSMain", "cs_5_1");
+	vertBlurComputeShader.CompileShader(L"../../Shaders/blur.hlsl", nullptr, "VertCSMain", "cs_5_1");
+	mShaders.insert({ "horzBlurCS", std::move(horzBlurComputeShader) });
+	mShaders.insert({ "vertBlurCS", std::move(vertBlurComputeShader) });
+
+	Shader sobelComputeShader;
+	sobelComputeShader.CompileShader(L"../../Shaders/sobel.hlsl", nullptr, "SobelCSMain", "cs_5_1");
+	mShaders.insert({ "sobelCS", std::move(sobelComputeShader) });
+
+	Shader compositeVertexShader;
+	Shader compositePixelShader;
+	compositeVertexShader.CompileShader(L"../../Shaders/composite.hlsl", nullptr, "VSMain", "vs_5_1");
+	compositePixelShader.CompileShader(L"../../Shaders/composite.hlsl", nullptr, "PSMain", "ps_5_1");
+	mShaders.insert({ "compositeVS", std::move(compositeVertexShader) });
+	mShaders.insert({ "compositePS", std::move(compositePixelShader) });
+
 	ConfigureInputElements();
-	CreateRootSignature(device, "default");
+	CreateDefaultRootSignature(device);
+	CreatePostProcessRootSignature(device);
 	CreateDefaultPSO(device, "opaque", "default", "opaque");
 	CreateDefaultPSO(device, "instancing", "default", "instancing");
+	CreateDefaultPSO(device, "composite", "default", "composite");
 	CreateSkyboxPSO(device, "sky", "default", "sky");
+	CreateBlurPSO(device);
+	CreateSobelPSO(device);
 
 	BuildRenderItems();
 
@@ -422,6 +442,12 @@ void Renderer::Resize()
 		mDepthStencil.GetDepthStencilBufferFormat(), D3D12_DSV_DIMENSION_TEXTURE2D, mDepthStencil.GetDepthStencilBuffer());
 
 	ConfigureViewportAndScissorRect();
+
+	mBlurFilter->ResizeBlurMap(mWindowWidth, mWindowHeight, device, 
+		mCbvSrvUavDescriptor, mDirect3D.GetCbvSrvUavDescriptorSize());
+
+	mSobelFilter->ResizeSobelMap(mWindowWidth, mWindowHeight, device,
+		mCbvSrvUavDescriptor, mDirect3D.GetCbvSrvUavDescriptorSize());
 }
 
 void Renderer::ExecuteCommandLists(ID3D12GraphicsCommandList* commandList, 
@@ -552,6 +578,35 @@ void Renderer::DrawScene()
 
 	currentPipelineState = mPSOs["instancing"].Get();
 	DrawRenderItems(RenderLayer::Instancing, commandList, currentPipelineState);
+
+	mBlurFilter->Execute(commandList, mRootSignatures["postprocess"].Get(), 
+		mPSOs["horzBlur"].Get(), mPSOs["vertBlur"].Get(), currentBackBuffer, 
+		mCbvSrvUavDescriptor, mDirect3D.GetCbvSrvUavDescriptorSize(), 4);
+
+	mSobelFilter->Execute(commandList, mRootSignatures["postprocess"].Get(),
+		mPSOs["sobel"].Get(), mBlurFilter->GetBlurMap(), mBlurFilter->GetBlurMapDescriptorIndex(),
+		mCbvSrvUavDescriptor, mDirect3D.GetCbvSrvUavDescriptorSize());
+
+	auto renderTexture = mRenderTexture.GetTextureResource();
+
+	commandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(renderTexture,
+		D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_COPY_DEST));
+
+	commandList->CopyResource(renderTexture, currentBackBuffer);
+
+	commandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(currentBackBuffer,
+		D3D12_RESOURCE_STATE_COPY_SOURCE, D3D12_RESOURCE_STATE_RENDER_TARGET));
+
+	commandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(renderTexture,
+		D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_GENERIC_READ));
+
+	cbvSrvUavDescriptor = mCbvSrvUavDescriptor.GetStartGPUDescriptorHandle();
+	cbvSrvUavDescriptor.Offset(mSobelFilter->GetSobelMapSrvDescriptorIndex(),
+		mDirect3D.GetCbvSrvUavDescriptorSize());
+	commandList->SetGraphicsRootDescriptorTable(6, cbvSrvUavDescriptor);
+
+	currentPipelineState = mPSOs["composite"].Get();
+	DrawRenderItems(RenderLayer::Composite, commandList, currentPipelineState);
 
 	commandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(currentBackBuffer,
 		D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PRESENT));
@@ -714,18 +769,18 @@ void Renderer::ConfigureInputElements()
 	};
 }
 
-void Renderer::CreateCommandQueue(ID3D12Device* device, D3D12_COMMAND_LIST_TYPE commandType)
+void Renderer::CreateDirectCommandQueue(ID3D12Device* device)
 {
 	D3D12_COMMAND_QUEUE_DESC commandQueueDesc;
 	commandQueueDesc.Flags = D3D12_COMMAND_QUEUE_FLAG_NONE;
 	commandQueueDesc.NodeMask = 0;
 	commandQueueDesc.Priority = D3D12_COMMAND_QUEUE_PRIORITY_NORMAL;
-	commandQueueDesc.Type = commandType;
+	commandQueueDesc.Type = D3D12_COMMAND_LIST_TYPE_DIRECT;
 
 	ThrowIfFailed(device->CreateCommandQueue(&commandQueueDesc, IID_PPV_ARGS(&mDirectCommandQueue)));
 }
 
-void Renderer::CreateRootSignature(ID3D12Device* device, const std::string& rootSignatureName)
+void Renderer::CreateDefaultRootSignature(ID3D12Device* device)
 {
 	RootSignature rootSignature = nullptr;
 
@@ -735,17 +790,21 @@ void Renderer::CreateRootSignature(ID3D12Device* device, const std::string& root
 	CD3DX12_DESCRIPTOR_RANGE texTable1;
 	texTable1.Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 1);
 
-	CD3DX12_ROOT_PARAMETER slotRootParameters[6];
+	CD3DX12_DESCRIPTOR_RANGE texTable2;
+	texTable2.Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 2);
+
+	CD3DX12_ROOT_PARAMETER slotRootParameters[7];
 	slotRootParameters[0].InitAsConstantBufferView(0);
 	slotRootParameters[1].InitAsConstantBufferView(1);
 	slotRootParameters[2].InitAsShaderResourceView(0, 1);
 	slotRootParameters[3].InitAsShaderResourceView(1, 1);
 	slotRootParameters[4].InitAsDescriptorTable(1, &texTable0, D3D12_SHADER_VISIBILITY_PIXEL);
 	slotRootParameters[5].InitAsDescriptorTable(1, &texTable1, D3D12_SHADER_VISIBILITY_PIXEL);
+	slotRootParameters[6].InitAsDescriptorTable(1, &texTable2, D3D12_SHADER_VISIBILITY_PIXEL);
 
 	auto samplers = Texture::GetStaticSamplers();
 
-	CD3DX12_ROOT_SIGNATURE_DESC rootSignatureDesc(6, slotRootParameters,
+	CD3DX12_ROOT_SIGNATURE_DESC rootSignatureDesc(7, slotRootParameters,
 		(UINT)samplers.size(), samplers.data(), 
 		D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT);
 
@@ -763,7 +822,42 @@ void Renderer::CreateRootSignature(ID3D12Device* device, const std::string& root
 	ThrowIfFailed(device->CreateRootSignature(1, serializedRootSignature->GetBufferPointer(),
 		serializedRootSignature->GetBufferSize(), IID_PPV_ARGS(&rootSignature)));
 
-	mRootSignatures.insert({ rootSignatureName, rootSignature });
+	mRootSignatures.insert({ "default", rootSignature });
+}
+void Renderer::CreatePostProcessRootSignature(ID3D12Device* device)
+{
+	RootSignature rootSignature = nullptr;
+
+	CD3DX12_DESCRIPTOR_RANGE srvTable;
+	srvTable.Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 0);
+
+	CD3DX12_DESCRIPTOR_RANGE uavTable;
+	uavTable.Init(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 1, 0);
+
+	CD3DX12_ROOT_PARAMETER slotRootParameters[3];
+	slotRootParameters[0].InitAsConstants(12, 0);
+	slotRootParameters[1].InitAsDescriptorTable(1, &srvTable);
+	slotRootParameters[2].InitAsDescriptorTable(1, &uavTable);
+
+	CD3DX12_ROOT_SIGNATURE_DESC rootSignatureDesc(3, slotRootParameters,
+		0, nullptr,
+		D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT);
+
+	ComPtr<ID3DBlob> serializedRootSignature;
+	ComPtr<ID3DBlob> error;
+	HRESULT hr = D3D12SerializeRootSignature(&rootSignatureDesc, D3D_ROOT_SIGNATURE_VERSION_1,
+		serializedRootSignature.GetAddressOf(), error.GetAddressOf());
+
+	if (error != nullptr)
+	{
+		::OutputDebugStringA((char*)error->GetBufferPointer());
+	}
+	ThrowIfFailed(hr);
+
+	ThrowIfFailed(device->CreateRootSignature(1, serializedRootSignature->GetBufferPointer(),
+		serializedRootSignature->GetBufferSize(), IID_PPV_ARGS(&rootSignature)));
+
+	mRootSignatures.insert({ "postprocess", rootSignature });
 }
 void Renderer::CreateDefaultPSO(ID3D12Device* device, const std::string& psoName,
 	const std::string& rootSignatureName, const std::string& shaderName)
@@ -823,6 +917,40 @@ void Renderer::CreateSkyboxPSO(ID3D12Device* device, const std::string& psoName,
 
 	mPSOs.insert({ psoName, pso });
 }
+void Renderer::CreateBlurPSO(ID3D12Device* device)
+{
+	PipelineStateObject pso = nullptr;
+
+	D3D12_COMPUTE_PIPELINE_STATE_DESC psoDesc;
+	ZeroMemory(&psoDesc, sizeof(D3D12_COMPUTE_PIPELINE_STATE_DESC));
+	psoDesc.CS = CD3DX12_SHADER_BYTECODE(mShaders["horzBlurCS"].GetShader());
+	psoDesc.Flags = D3D12_PIPELINE_STATE_FLAG_NONE;
+	psoDesc.pRootSignature = mRootSignatures["postprocess"].Get();
+
+	ThrowIfFailed(device->CreateComputePipelineState(&psoDesc, IID_PPV_ARGS(&pso)));
+
+	mPSOs.insert({ "horzBlur", pso });
+
+	psoDesc.CS = CD3DX12_SHADER_BYTECODE(mShaders["vertBlurCS"].GetShader());
+
+	ThrowIfFailed(device->CreateComputePipelineState(&psoDesc, IID_PPV_ARGS(&pso)));
+
+	mPSOs.insert({ "vertBlur", pso });
+}
+void Renderer::CreateSobelPSO(ID3D12Device* device)
+{
+	PipelineStateObject pso = nullptr;
+
+	D3D12_COMPUTE_PIPELINE_STATE_DESC psoDesc;
+	ZeroMemory(&psoDesc, sizeof(D3D12_COMPUTE_PIPELINE_STATE_DESC));
+	psoDesc.CS = CD3DX12_SHADER_BYTECODE(mShaders["sobelCS"].GetShader());
+	psoDesc.Flags = D3D12_PIPELINE_STATE_FLAG_NONE;
+	psoDesc.pRootSignature = mRootSignatures["postprocess"].Get();
+
+	ThrowIfFailed(device->CreateComputePipelineState(&psoDesc, IID_PPV_ARGS(&pso)));
+
+	mPSOs.insert({ "sobel", pso });
+}
 
 void Renderer::LoadTextures()
 {
@@ -849,18 +977,6 @@ void Renderer::LoadTextures()
 	texName = "sky";
 	skyTexture.CreateTexture(device, commandList, texName.c_str(), L"../../Textures/yokohama2.dds");
 	mTextures.insert({ texName, std::move(skyTexture) });
-
-	UINT i = 0;
-	auto teapotRawTextures = mUtahTeapot.GetRawTextures();
-	for (auto& texture : teapotRawTextures)
-	{
-		texName = "teapot" + std::to_string(i);
-		std::wstring filePath = D3D12Utility::ImageFormatToDDS(texture.GetTextureFilename());
-		filePath.insert(0, L"../../Models/teapot/");
-		texture.CreateTexture(device, commandList, texName.c_str(), filePath.c_str());
-		mTextures.insert({ texName, texture });
-		i++;
-	}
 }
 void Renderer::BuildMaterials()
 {
@@ -887,14 +1003,6 @@ void Renderer::BuildMaterials()
 	aquaGrid.roughness = 0.1f;
 
 	mMaterials.insert({ aquaGrid.name, std::move(aquaGrid) });
-
-	Material teapot;
-	teapot.name = "teapot";
-	teapot.diffuseAlbedo = XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f);
-	teapot.fresnelR0 = XMFLOAT3(0.07f, 0.07f, 0.07f);
-	teapot.roughness = 0.3f;
-
-	mMaterials.insert({ teapot.name, std::move(teapot) });
 }
 
 void Renderer::BuildRenderItems()
@@ -935,22 +1043,21 @@ void Renderer::BuildRenderItems()
 
 	std::uniform_real_distribution<float> worldDistribution(-20.0f, 20.0f);
 	std::uniform_int_distribution<int> materialIndexDistribution(0, 2);
-	
-	renderItem.mesh = mMeshes["teapot0"];
+
+	renderItem.mesh = mMeshes["box"];
 	world = XMMatrixIdentity();
 	XMStoreFloat4x4(&renderItem.world, world);
 	renderItem.objectCBIndex = -1;
-	renderItem.diffuseMapIndex = 4;
-	renderItem.materialCBIndex = 3;
+	renderItem.diffuseMapIndex = 2;
+	renderItem.materialCBIndex = -1;
 	renderItem.instanceCount = 50;
 	renderItem.instanceDatas.resize(renderItem.instanceCount);
 
-	XMMATRIX scalingMatrix = XMMatrixScaling(0.1f, 0.1f, 0.1f);
-	XMMATRIX rotationMatrix = XMMatrixRotationX(-XM_PIDIV2);
+	XMMATRIX scalingMatrix = XMMatrixScaling(0.3f, 0.3f, 0.3f);
 	for (UINT i = 0; i < renderItem.instanceCount; i++)
 	{
 		world = XMMatrixTranslation(worldDistribution(generator), worldDistribution(generator), worldDistribution(generator));
-		world = XMMatrixMultiply(XMMatrixMultiply(rotationMatrix, scalingMatrix), world);
+		world = XMMatrixMultiply(scalingMatrix, world);
 		XMStoreFloat4x4(&renderItem.instanceDatas[i].world, world);
 		renderItem.instanceDatas[i].materialIndex = materialIndexDistribution(generator);
 	}
@@ -963,11 +1070,22 @@ void Renderer::BuildRenderItems()
 	XMStoreFloat4x4(&renderItem.world, world);
 	renderItem.objectCBIndex = 3;
 	renderItem.diffuseMapIndex = 3;
-	renderItem.materialCBIndex = -1;
+	renderItem.materialCBIndex = 3;
 	renderItem.instanceCount = 1;
 	mSkyRenderItems.push_back(renderItem);
 
 	mAllRenderItems.insert({ RenderLayer::Sky, mSkyRenderItems });
+
+	renderItem.mesh = mMeshes["quad"];
+	world = XMMatrixIdentity();
+	XMStoreFloat4x4(&renderItem.world, world);
+	renderItem.objectCBIndex = 4;
+	renderItem.diffuseMapIndex = 4;
+	renderItem.materialCBIndex = -1;
+	renderItem.instanceCount = 1;
+	mCompositeRenderItems.push_back(renderItem);
+
+	mAllRenderItems.insert({ RenderLayer::Composite, mCompositeRenderItems });
 }
 void Renderer::DrawRenderItems(RenderLayer renderLayer, ID3D12GraphicsCommandList* commandList,
 	ID3D12PipelineState* pipelineState)

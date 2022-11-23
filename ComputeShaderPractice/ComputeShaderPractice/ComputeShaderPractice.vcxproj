@@ -21,8 +21,8 @@
   <PropertyGroup Label="Globals">
     <VCProjectVersion>16.0</VCProjectVersion>
     <Keyword>Win32Proj</Keyword>
-    <ProjectGuid>{1e414021-0f41-41a8-a700-23780607d88b}</ProjectGuid>
-    <RootNamespace>Direct3D12MultiThreading</RootNamespace>
+    <ProjectGuid>{04c789e2-1f17-4d0d-a2d4-66ebb7f47d95}</ProjectGuid>
+    <RootNamespace>ComputeShaderPractice</RootNamespace>
     <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
@@ -116,7 +116,7 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>_DEBUG;_WINDOWS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>false</ConformanceMode>
-      <AdditionalIncludeDirectories>F:\MyDirect3D12Engine\Library\include;F:\MyDirect3D12Engine\Library\include\stb</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>F:\MyDirect3D12Engine\Library\include;F:\MyDirect3D12Engine\Library\include\stb;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
@@ -133,7 +133,7 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>NDEBUG;_WINDOWS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>false</ConformanceMode>
-      <AdditionalIncludeDirectories>F:\MyDirect3D12Engine\Library\include;F:\MyDirect3D12Engine\Library\include\stb</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>F:\MyDirect3D12Engine\Library\include;F:\MyDirect3D12Engine\Library\include\stb;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
@@ -160,8 +160,10 @@
     <ClInclude Include="..\..\Core\includes\Timer.h" />
     <ClInclude Include="..\..\Core\includes\UploadBuffer.h" />
     <ClInclude Include="..\..\Core\includes\Utility.h" />
+    <ClInclude Include="BlurFilter.h" />
     <ClInclude Include="FrameResource.h" />
     <ClInclude Include="Renderer.h" />
+    <ClInclude Include="SobelFilter.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\Core\sources\BasicGeometryGenerator.cpp" />
@@ -177,9 +179,11 @@
     <ClCompile Include="..\..\Core\sources\Texture.cpp" />
     <ClCompile Include="..\..\Core\sources\Timer.cpp" />
     <ClCompile Include="..\..\Core\sources\Utility.cpp" />
+    <ClCompile Include="BlurFilter.cpp" />
     <ClCompile Include="FrameResource.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="Renderer.cpp" />
+    <ClCompile Include="SobelFilter.cpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

@@ -16,6 +16,8 @@ public:
 	Mesh CreateTerrain(const unsigned char* heightValues, 
 		int width, int height, int nChannels);
 	Mesh CreateTerrainPatches(int width, int height, UINT countOfPatches);
+
+	Mesh CreateQuad(float x, float y, float w, float h, float depth);
 private:
 	std::vector<Vertex> mVertices;
 	UINT mVertexCount;

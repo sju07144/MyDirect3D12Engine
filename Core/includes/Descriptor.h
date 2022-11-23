@@ -12,6 +12,11 @@ public:
 	CD3DX12_CPU_DESCRIPTOR_HANDLE GetStartCPUDescriptorHandle();
 	CD3DX12_GPU_DESCRIPTOR_HANDLE GetStartGPUDescriptorHandle();
 
+	CD3DX12_CPU_DESCRIPTOR_HANDLE GetCurrentCPUDescriptorHandle();
+	CD3DX12_GPU_DESCRIPTOR_HANDLE GetCurrentGPUDescriptorHandle();
+
+	int GetCurrentDescriptorIndex();
+
 	void ResetDescriptorHeap();
 
 	virtual void CreateDescriptorHeap(ID3D12Device* device, UINT descriptorCount) = 0;

@@ -13,6 +13,20 @@ CD3DX12_GPU_DESCRIPTOR_HANDLE Descriptor::GetStartGPUDescriptorHandle()
 	return CD3DX12_GPU_DESCRIPTOR_HANDLE(mDescriptorHeap->GetGPUDescriptorHandleForHeapStart());
 }
 
+CD3DX12_CPU_DESCRIPTOR_HANDLE Descriptor::GetCurrentCPUDescriptorHandle()
+{
+	return mCpuDescriptorHandle;
+}
+CD3DX12_GPU_DESCRIPTOR_HANDLE Descriptor::GetCurrentGPUDescriptorHandle()
+{
+	return mGpuDescriptorHandle;
+}
+
+int Descriptor::GetCurrentDescriptorIndex()
+{
+	return static_cast<int>(mDescriptorCount) - 1;
+}
+
 void Descriptor::ResetDescriptorHeap()
 {
 	mCpuDescriptorHandle = mDescriptorHeap->GetCPUDescriptorHandleForHeapStart();
@@ -159,6 +173,7 @@ void CbvSrvUavDescriptor::CreateUnorderedAccessView(ID3D12Device* device, UINT d
 {
 	D3D12_UNORDERED_ACCESS_VIEW_DESC uavDesc;
 	uavDesc.ViewDimension = viewDimension;
+	uavDesc.Format = viewFormat;
 
 	switch (viewDimension)
 	{

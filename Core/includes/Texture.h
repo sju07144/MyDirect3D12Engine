@@ -25,6 +25,11 @@ public:
 		ID3D12GraphicsCommandList* commandList,
 		const char* textureName);
 
+	void CreateDefaultTexture(
+		ID3D12Device* device,
+		UINT width, UINT height,
+		DXGI_FORMAT format);
+
 	ID3D12Resource* GetTextureResource();
 
 	static std::array<const CD3DX12_STATIC_SAMPLER_DESC, 7> GetStaticSamplers();

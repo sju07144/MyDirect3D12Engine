@@ -61,6 +61,15 @@ UINT BasicDirect3DComponent::GetCbvSrvUavDescriptorSize()
 	return mCbvSrvUavDescriptorSize;
 }
 
+void BasicDirect3DComponent::PlusOneFenceValue()
+{
+	mCurrentFenceValue++;
+}
+UINT64 BasicDirect3DComponent::GetFenceValue()
+{
+	return mCurrentFenceValue;
+}
+
 void BasicDirect3DComponent::CreateFactory()
 {
 	ThrowIfFailed(CreateDXGIFactory(IID_PPV_ARGS(&mFactory)));

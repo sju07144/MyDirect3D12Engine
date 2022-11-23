@@ -64,3 +64,10 @@ UINT D3D12Utility::CalculateConstantBufferSize(UINT size)
 	// Constant buffer size must be multiple of 256 byte.
 	return (size + 255) & ~255;
 }
+
+std::wstring D3D12Utility::ImageFormatToDDS(const std::wstring& filePath)
+{
+	std::wstring newPath(filePath);
+	newPath.replace(newPath.end() - 3, newPath.end(), L"dds");
+	return newPath;
+}

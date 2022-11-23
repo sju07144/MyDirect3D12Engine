@@ -348,3 +348,47 @@ Mesh BasicGeometryGenerator::CreateTerrainPatches(int width, int height, UINT co
 
 	return Mesh(vertices, indices, D3D_PRIMITIVE_TOPOLOGY_4_CONTROL_POINT_PATCHLIST);
 }
+
+Mesh BasicGeometryGenerator::CreateQuad(float x, float y, float w, float h, float depth)
+{
+	std::vector<Vertex> vertices;
+	std::vector<uint32_t> indices;
+
+	vertices.resize(4);
+	indices.resize(6);
+
+	// Position coordinates specified in NDC space.
+	vertices[0] = Vertex(
+		x, y - h, depth,
+		0.0f, 0.0f, -1.0f,
+		// 1.0f, 0.0f, 0.0f,
+		0.0f, 1.0f);
+
+	vertices[1] = Vertex(
+		x, y, depth,
+		0.0f, 0.0f, -1.0f,
+		// 1.0f, 0.0f, 0.0f,
+		0.0f, 0.0f);
+
+	vertices[2] = Vertex(
+		x + w, y, depth,
+		0.0f, 0.0f, -1.0f,
+		// 1.0f, 0.0f, 0.0f,
+		1.0f, 0.0f);
+
+	vertices[3] = Vertex(
+		x + w, y - h, depth,
+		0.0f, 0.0f, -1.0f,
+		// 1.0f, 0.0f, 0.0f,
+		1.0f, 1.0f);
+
+	indices[0] = 0;
+	indices[1] = 1;
+	indices[2] = 2;
+	
+	indices[3] = 0;
+	indices[4] = 2;
+	indices[5] = 3;
+
+	return Mesh(vertices, indices);
+}
